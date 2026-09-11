@@ -11,6 +11,11 @@ internal object CustomHeaderFilter {
 
     /**
      * 禁止用户手动设置的 header 名称（大小写不敏感）。
+     *
+     * 注意：`authorization` / `x-api-key` 不再默认禁止，允许用户通过自定义请求头
+     * 覆盖默认认证（例如接入中转站时使用 `Authorization: Bearer <token>` 而非
+     * API Key 字段）。但 `anthropic-version` 仍由 Provider 配置字段单独控制，
+     * 不允许在自定义头中覆盖，避免协议版本漂移。
      */
     private val FORBIDDEN_NAMES = setOf(
         "host",
@@ -23,8 +28,6 @@ internal object CustomHeaderFilter {
         "keep-alive",
         "proxy-connection",
         "upgrade",
-        "authorization",
-        "x-api-key",
         "anthropic-version"
     )
 

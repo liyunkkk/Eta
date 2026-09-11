@@ -1157,4 +1157,18 @@
   <string name="data_backup_imported">已导入 %1$d 个对话和 %2$d 个模型提供商</string>
   <string name="data_backup_failed">备份操作失败</string>
   <string name="data_backup_file_open_failed">无法打开所选文件</string>
+  <string name="provider_custom_http">自定义 HTTP 参数</string>
+  <string name="provider_custom_headers">请求头</string>
+  <string name="provider_add_header">添加请求头</string>
+  <string name="provider_no_headers">暂无自定义请求头。网关需要时，可添加 User-Agent 或 Authorization 等请求头。</string>
+  <string name="provider_header_name">请求头名称</string>
+  <string name="provider_header_value">请求头值</string>
+  <string name="provider_remove_header">删除请求头</string>
+  <string name="provider_custom_body">请求体字段</string>
+  <string name="provider_add_body">添加字段</string>
+  <string name="provider_no_body">暂无自定义请求体字段。值使用 JSON 语法，例如 true、1、"文本" 或 {"key":"value"}。</string>
+  <string name="provider_body_key">字段名称</string>
+  <string name="provider_body_value_json">值（JSON）</string>
+  <string name="provider_body_invalid_json">请输入有效的 JSON 值</string>
+  <string name="provider_remove_body">删除请求体字段</string>
 </resources>

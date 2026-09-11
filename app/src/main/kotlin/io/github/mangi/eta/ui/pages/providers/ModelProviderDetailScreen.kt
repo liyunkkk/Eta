@@ -41,11 +41,14 @@ import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.EtaApp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.data.model.AnthropicProviderSetting
+import io.github.mangi.eta.data.model.CustomBody
+import io.github.mangi.eta.data.model.CustomHeader
 import io.github.mangi.eta.data.model.CustomProviderSetting
 import io.github.mangi.eta.data.model.OpenAiCompatibleProviderSetting
 import io.github.mangi.eta.data.model.OpenAiEndpointMode
 import io.github.mangi.eta.data.model.ProviderSetting
 import io.github.mangi.eta.data.model.withId
+import io.github.mangi.eta.data.db.ProviderJson
 import io.github.mangi.eta.data.repository.ProviderRepository
 import io.github.mangi.eta.data.repository.RemoteModelFetcher
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
@@ -88,6 +91,8 @@ internal data class ProviderConfigDraft(
     val endpointMode: String,
     val hostedWebSearchEnabled: Boolean,
     val anthropicVersion: String,
+    val customHeaders: List<CustomHeader> = emptyList(),
+    val customBody: List<CustomBody> = emptyList(),
 ) {
     companion object {
         fun from(provider: ProviderSetting): ProviderConfigDraft = ProviderConfigDraft(
@@ -104,6 +109,8 @@ internal data class ProviderConfigDraft(
             hostedWebSearchEnabled = provider.hostedWebSearchEnabled,
             anthropicVersion = (provider as? AnthropicProviderSetting)?.anthropicVersion
                 ?: AnthropicProviderSetting.DEFAULT_ANTHROPIC_VERSION,
+            customHeaders = provider.customHeaders,
+            customBody = provider.customBody,
         )
     }
 }
@@ -119,6 +126,8 @@ internal val ProviderConfigDraftSaver = mapSaver(
             "endpointMode" to draft.endpointMode,
             "hostedWebSearchEnabled" to draft.hostedWebSearchEnabled,
             "anthropicVersion" to draft.anthropicVersion,
+            "customHeaders" to ProviderJson.encodeHeaders(draft.customHeaders),
+            "customBody" to ProviderJson.encodeBody(draft.customBody),
         )
     },
     restore = { state ->
@@ -131,6 +140,8 @@ internal val ProviderConfigDraftSaver = mapSaver(
             endpointMode = state.getValue("endpointMode") as String,
             hostedWebSearchEnabled = state.getValue("hostedWebSearchEnabled") as Boolean,
             anthropicVersion = state.getValue("anthropicVersion") as String,
+            customHeaders = ProviderJson.decodeHeaders(state["customHeaders"] as? String ?: "[]"),
+            customBody = ProviderJson.decodeBody(state["customBody"] as? String ?: "[]"),
         )
     },
 )
@@ -392,6 +403,8 @@ private fun ProviderConfigTab(
                                         endpointMode = draft.endpointMode,
                                         hostedWebSearchEnabled = draft.hostedWebSearchEnabled,
                                         anthropicVersion = draft.anthropicVersion,
+                                        customHeaders = draft.customHeaders,
+                                        customBody = draft.customBody,
                                     )
                                 )
                             } finally {
@@ -399,6 +412,17 @@ private fun ProviderConfigTab(
                             }
                         }
                     },
+                )
+            }
+        }
+
+        item(key = "custom_http") {
+            ProviderSection(title = stringResource(R.string.provider_custom_http)) {
+                CustomHttpEditor(
+                    headers = draft.customHeaders,
+                    body = draft.customBody,
+                    onHeadersChange = { onDraftChange(draft.copy(customHeaders = it)) },
+                    onBodyChange = { onDraftChange(draft.copy(customBody = it)) },
                 )
             }
         }
@@ -468,6 +492,8 @@ private fun ProviderConfigTab(
                                 endpointMode = draft.endpointMode,
                                 hostedWebSearchEnabled = draft.hostedWebSearchEnabled,
                                 anthropicVersion = draft.anthropicVersion,
+                                customHeaders = draft.customHeaders,
+                                customBody = draft.customBody,
                             )
                             try {
                                 if (isNew) {
@@ -645,6 +671,8 @@ private fun buildUpdatedProvider(
     endpointMode: String,
     hostedWebSearchEnabled: Boolean,
     anthropicVersion: String,
+    customHeaders: List<CustomHeader> = emptyList(),
+    customBody: List<CustomBody> = emptyList(),
 ): ProviderSetting {
     val prompt = systemPrompt.trim().takeIf { it.isNotBlank() }
     return when (source) {
@@ -656,6 +684,8 @@ private fun buildUpdatedProvider(
             isEnabled = isEnabled,
             endpointMode = endpointMode,
             hostedWebSearchEnabled = hostedWebSearchEnabled,
+            customHeaders = customHeaders,
+            customBody = customBody,
         )
         is CustomProviderSetting -> source.copy(
             name = name.trim(),
@@ -665,6 +695,8 @@ private fun buildUpdatedProvider(
             isEnabled = isEnabled,
             endpointMode = endpointMode,
             hostedWebSearchEnabled = hostedWebSearchEnabled,
+            customHeaders = customHeaders,
+            customBody = customBody,
         )
         is AnthropicProviderSetting -> source.copy(
             name = name.trim(),
@@ -673,6 +705,8 @@ private fun buildUpdatedProvider(
             systemPrompt = prompt,
             isEnabled = isEnabled,
             anthropicVersion = anthropicVersion.trim().ifBlank { AnthropicProviderSetting.DEFAULT_ANTHROPIC_VERSION },
+            customHeaders = customHeaders,
+            customBody = customBody,
         )
     }
 }

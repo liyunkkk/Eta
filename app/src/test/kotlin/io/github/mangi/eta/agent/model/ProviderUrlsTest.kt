@@ -26,5 +26,17 @@ class ProviderUrlsTest {
             "https://api.anthropic.com/v1/models",
             ProviderUrls.anthropicModelsUrl("https://api.anthropic.com")
         )
+        assertEquals(
+            "https://api.justwoker.icu/v1/messages",
+            ProviderUrls.anthropicMessagesUrl("https://api.justwoker.icu/v1/")
+        )
+        assertEquals(
+            "https://api.justwoker.icu/v1/models",
+            ProviderUrls.anthropicModelsUrl("https://api.justwoker.icu/v1")
+        )
+        assertEquals(
+            "https://gateway.example/anthropic/v1/messages",
+            ProviderUrls.anthropicMessagesUrl("https://gateway.example/anthropic")
+        )
     }
 }

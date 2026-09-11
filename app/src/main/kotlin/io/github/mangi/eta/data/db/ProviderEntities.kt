@@ -267,7 +267,7 @@ private fun ProviderModelEntity.toDomain(): Model =
         createdAt = createdAt,
     )
 
-private object ProviderJson {
+internal object ProviderJson {
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true

@@ -11,19 +11,29 @@ import org.junit.Test
 
 class CustomHeaderAndBodyTest {
     @Test
-    fun forbiddenHeadersCannotOverrideTransportOrAuthHeaders() {
+    fun authHeadersCanOverrideDefaultsWhileTransportHeadersStayForbidden() {
         val sanitized = CustomHeaderFilter.sanitize(
             listOf(
-                CustomHeader("Authorization", "Bearer bad"),
-                CustomHeader("x-api-key", "bad"),
+                CustomHeader("Authorization", "Bearer custom"),
+                CustomHeader("x-api-key", "custom-key"),
                 CustomHeader("host", "example.com"),
+                CustomHeader("anthropic-version", "unsupported-override"),
                 CustomHeader("x-extra", "ok")
             )
         )
 
-        assertEquals(listOf(CustomHeader("x-extra", "ok")), sanitized)
-        assertTrue(CustomHeaderFilter.isForbidden("authorization"))
-        assertFalse(CustomHeaderFilter.isForbidden("x-extra"))
+        assertEquals(
+            listOf(
+                CustomHeader("Authorization", "Bearer custom"),
+                CustomHeader("x-api-key", "custom-key"),
+                CustomHeader("x-extra", "ok")
+            ),
+            sanitized
+        )
+        assertFalse(CustomHeaderFilter.isForbidden("authorization"))
+        assertFalse(CustomHeaderFilter.isForbidden("x-api-key"))
+        assertTrue(CustomHeaderFilter.isForbidden("host"))
+        assertTrue(CustomHeaderFilter.isForbidden("anthropic-version"))
     }
 
     @Test

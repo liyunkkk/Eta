@@ -1157,4 +1157,18 @@
   <string name="data_backup_imported">已匯入 %1$d 個對話與 %2$d 個模型供應商</string>
   <string name="data_backup_failed">備份操作失敗</string>
   <string name="data_backup_file_open_failed">無法開啟所選檔案</string>
+  <string name="provider_custom_http">自訂 HTTP 參數</string>
+  <string name="provider_custom_headers">請求標頭</string>
+  <string name="provider_add_header">新增請求標頭</string>
+  <string name="provider_no_headers">暫無自訂請求標頭。閘道需要時，可新增 User-Agent 或 Authorization 等請求標頭。</string>
+  <string name="provider_header_name">請求標頭名稱</string>
+  <string name="provider_header_value">請求標頭值</string>
+  <string name="provider_remove_header">刪除請求標頭</string>
+  <string name="provider_custom_body">請求本文欄位</string>
+  <string name="provider_add_body">新增欄位</string>
+  <string name="provider_no_body">暫無自訂請求本文欄位。值使用 JSON 語法，例如 true、1、"文字" 或 {"key":"value"}。</string>
+  <string name="provider_body_key">欄位名稱</string>
+  <string name="provider_body_value_json">值（JSON）</string>
+  <string name="provider_body_invalid_json">請輸入有效的 JSON 值</string>
+  <string name="provider_remove_body">刪除請求本文欄位</string>
 </resources>

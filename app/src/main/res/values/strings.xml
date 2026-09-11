@@ -1174,4 +1174,18 @@
   <string name="data_backup_imported">Imported %1$d conversations and %2$d providers</string>
   <string name="data_backup_failed">Backup operation failed</string>
   <string name="data_backup_file_open_failed">Unable to open the selected file</string>
+  <string name="provider_custom_http">Custom HTTP parameters</string>
+  <string name="provider_custom_headers">Request headers</string>
+  <string name="provider_add_header">Add header</string>
+  <string name="provider_no_headers">No custom headers. Add headers such as User-Agent or Authorization when required by a gateway.</string>
+  <string name="provider_header_name">Header name</string>
+  <string name="provider_header_value">Header value</string>
+  <string name="provider_remove_header">Remove header</string>
+  <string name="provider_custom_body">Request body fields</string>
+  <string name="provider_add_body">Add field</string>
+  <string name="provider_no_body">No custom body fields. Values use JSON syntax, for example true, 1, "text", or {"key":"value"}.</string>
+  <string name="provider_body_key">Field name</string>
+  <string name="provider_body_value_json">Value (JSON)</string>
+  <string name="provider_body_invalid_json">Enter a valid JSON value</string>
+  <string name="provider_remove_body">Remove body field</string>
 </resources>
