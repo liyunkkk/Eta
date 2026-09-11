@@ -58,8 +58,28 @@ jobs:
           [[ -n "$ETA_RELEASE_KEY_PASSWORD" ]] && configured=$((configured + 1))
 
           if [[ "$configured" -eq 0 ]]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "未配置 Release 签名 Secrets，本次仅构建 Debug APK。"
+            temporary_store="$RUNNER_TEMP/eta-r8-release.jks"
+            temporary_password="eta-r8-temporary"
+            temporary_alias="eta-r8"
+            keytool -genkeypair \
+              -keystore "$temporary_store" \
+              -storepass "$temporary_password" \
+              -keypass "$temporary_password" \
+              -alias "$temporary_alias" \
+              -keyalg RSA \
+              -keysize 3072 \
+              -validity 3650 \
+              -dname "CN=Eta R8 Temporary Build,OU=GitHub Actions,O=Eta,C=CN" \
+              -noprompt
+            {
+              echo "ETA_RELEASE_STORE_FILE=$temporary_store"
+              echo "ETA_RELEASE_STORE_PASSWORD=$temporary_password"
+              echo "ETA_RELEASE_KEY_ALIAS=$temporary_alias"
+              echo "ETA_RELEASE_KEY_PASSWORD=$temporary_password"
+            } >> "$GITHUB_ENV"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "temporary=true" >> "$GITHUB_OUTPUT"
+            echo "未配置正式签名 Secrets，已生成临时证书用于 R8 Release 构建。"
             exit 0
           fi
           if [[ "$configured" -ne 4 ]]; then
@@ -70,7 +90,14 @@ jobs:
           printf '%s' "$ETA_RELEASE_KEYSTORE_BASE64" \
             | base64 --decode \
             > "$RUNNER_TEMP/eta-release.jks"
+          {
+            echo "ETA_RELEASE_STORE_FILE=$RUNNER_TEMP/eta-release.jks"
+            echo "ETA_RELEASE_STORE_PASSWORD=$ETA_RELEASE_STORE_PASSWORD"
+            echo "ETA_RELEASE_KEY_ALIAS=$ETA_RELEASE_KEY_ALIAS"
+            echo "ETA_RELEASE_KEY_PASSWORD=$ETA_RELEASE_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
           echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "temporary=false" >> "$GITHUB_OUTPUT"
 
       - name: 运行 Provider 定向单元测试
         run: >-
@@ -84,13 +111,8 @@ jobs:
           ./gradlew --no-daemon --no-configuration-cache
           :app:assembleDebug
 
-      - name: 构建 Release APK
+      - name: 构建 R8 Release APK
         if: steps.signing.outputs.enabled == 'true'
-        env:
-          ETA_RELEASE_STORE_FILE: ${{ runner.temp }}/eta-release.jks
-          ETA_RELEASE_STORE_PASSWORD: ${{ secrets.ETA_RELEASE_STORE_PASSWORD }}
-          ETA_RELEASE_KEY_ALIAS: ${{ secrets.ETA_RELEASE_KEY_ALIAS }}
-          ETA_RELEASE_KEY_PASSWORD: ${{ secrets.ETA_RELEASE_KEY_PASSWORD }}
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
           :app:assembleRelease
@@ -125,8 +147,8 @@ jobs:
               exit 1
             fi
             "$apksigner_path" verify "$release_apk"
-            cp "$release_apk" "$output_dir/app-release.apk"
-            echo "release_path=$output_dir/app-release.apk" >> "$GITHUB_OUTPUT"
+            cp "$release_apk" "$output_dir/app-release-r8.apk"
+            echo "release_path=$output_dir/app-release-r8.apk" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 上传 Debug APK
@@ -137,7 +159,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: 上传 Release APK
+      - name: 上传 R8 Release APK
         if: steps.signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
