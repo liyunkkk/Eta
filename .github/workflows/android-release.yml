@@ -72,6 +72,13 @@ jobs:
             > "$RUNNER_TEMP/eta-release.jks"
           echo "enabled=true" >> "$GITHUB_OUTPUT"
 
+      - name: 运行 Provider 定向单元测试
+        run: >-
+          ./gradlew --no-daemon --no-configuration-cache
+          :app:testDebugUnitTest
+          --tests io.github.mangi.eta.agent.model.CustomHeaderAndBodyTest
+          --tests io.github.mangi.eta.agent.model.ProviderUrlsTest
+
       - name: 构建 Debug APK
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
