@@ -16,6 +16,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import io.github.mangi.eta.EtaApp
+import io.github.mangi.eta.ui.MainActivity
+import io.github.mangi.eta.agent.runtime.AgentNotificationTrampolineActivity
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.accessibility.AgentAccessibilityService
 import io.github.mangi.eta.agent.device.AgentFileReferenceGateway
@@ -1364,6 +1366,22 @@ internal class AgentAppState(
             }
             withContext(Dispatchers.Main) {
                 applyRunResult(runId, result, acknowledgeRuntimeResult = true)
+                if (!MainActivity.isForeground && result.error != LEGACY_STOPPED_ERROR && result.error != SYNTHETIC_STATUS_STOPPED) {
+                    val title = prompt.lineSequence().firstOrNull()?.trim()?.take(30).orEmpty()
+                    val content = if (result.ok) {
+                        result.content.trim().take(200)
+                    } else {
+                        result.error.orEmpty()
+                    }
+                    AgentExecutionService.postCompletionNotification(
+                        context = appContext,
+                        runId = runId,
+                        title = title,
+                        content = content,
+                        isError = !result.ok,
+                        source = AgentNotificationTrampolineActivity.SOURCE_MAIN,
+                    )
+                }
             }
         }
         currentRunJob = preparationJob

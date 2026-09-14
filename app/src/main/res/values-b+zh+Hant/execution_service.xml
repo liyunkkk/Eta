@@ -12,4 +12,7 @@
     <string name="execution_phase_tool_generic">正在執行外部操作</string>
     <string name="execution_phase_generating">正在組織回覆…</string>
     <string name="execution_phase_generating_detail">正在生成解答內容</string>
+    <string name="execution_completed_channel">任務完成通知</string>
+    <string name="execution_completed_default">任務執行完成</string>
+    <string name="execution_failed_default">任務執行失敗</string>
 </resources>

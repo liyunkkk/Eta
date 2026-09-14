@@ -1,4 +1,5 @@
 package io.github.mangi.eta.agent.runtime
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -30,9 +31,9 @@ internal class AgentExecutionService : Service() {
         instance = this
         leases.attachOwner(owner)
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, getString(R.string.execution_channel), NotificationManager.IMPORTANCE_LOW),
-        )
+        if (manager != null) {
+            ensureChannels(this, manager)
+        }
         ensureForeground()
     }
 
@@ -81,7 +82,7 @@ internal class AgentExecutionService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } else {
-            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification())
+            getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, notification())
         }
     }
 
@@ -138,14 +139,73 @@ internal class AgentExecutionService : Service() {
     }
 
     companion object {
-        private const val CHANNEL = "eta_execution"
+        const val CHANNEL = "eta_execution"
+        const val CHANNEL_COMPLETED = "eta_completed"
         private const val NOTIFICATION_ID = 1107
+        private const val COMPLETION_NOTIFICATION_ID_BASE = 20000
         private const val ACTION_STOP = "io.github.mangi.eta.action.STOP_USER_EXECUTION"
         private val leases = ExecutionLeaseRegistry()
         private val ownerSequence = AtomicLong()
         private val mainHandler = Handler(Looper.getMainLooper())
         @Volatile private var instance: AgentExecutionService? = null
         @Volatile private var executionState = AgentExecutionState()
+
+        fun ensureChannels(context: Context, manager: NotificationManager) {
+            val executionChannel = NotificationChannel(
+                CHANNEL,
+                context.getString(R.string.execution_channel),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                setSound(null, null)
+                enableVibration(false)
+            }
+            val completedChannel = NotificationChannel(
+                CHANNEL_COMPLETED,
+                context.getString(R.string.execution_completed_channel),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            )
+            manager.createNotificationChannel(executionChannel)
+            manager.createNotificationChannel(completedChannel)
+        }
+
+        fun postCompletionNotification(
+            context: Context,
+            runId: String,
+            title: String,
+            content: String,
+            isError: Boolean = false,
+            source: String = AgentNotificationTrampolineActivity.SOURCE_MAIN,
+        ) {
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return
+            ensureChannels(context, manager)
+            val intent = Intent(context, AgentNotificationTrampolineActivity::class.java).apply {
+                putExtra(AgentNotificationTrampolineActivity.EXTRA_SOURCE, source)
+            }
+            val open = PendingIntent.getActivity(
+                context,
+                runId.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val displayTitle = if (isError) {
+                context.getString(R.string.execution_failed_default)
+            } else {
+                title.ifBlank { context.getString(R.string.execution_completed_default) }
+            }
+            val displayContent = content.ifBlank {
+                if (isError) "" else context.getString(R.string.execution_completed_default)
+            }
+            val builder = Notification.Builder(context, CHANNEL_COMPLETED)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(displayTitle)
+                .setContentText(displayContent)
+                .setStyle(Notification.BigTextStyle().bigText(displayContent))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setShowWhen(true)
+            val notificationId = COMPLETION_NOTIFICATION_ID_BASE + (runId.hashCode() and 0x7FFF)
+            manager.notify(notificationId, builder.build())
+        }
 
         fun updateExecutionState(state: AgentExecutionState) {
             executionState = state

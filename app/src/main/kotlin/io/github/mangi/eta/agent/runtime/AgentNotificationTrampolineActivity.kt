@@ -10,16 +10,23 @@ class AgentNotificationTrampolineActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
-            if (EtaAssistantOverlayService.isServiceActive()) {
+            val source = intent.getStringExtra(EXTRA_SOURCE)
+            if (source == SOURCE_OVERLAY && EtaAssistantOverlayService.isServiceActive()) {
                 EtaAssistantOverlayService.show(this)
             } else {
-                val intent = Intent(this, MainActivity::class.java).apply {
+                val mainIntent = Intent(this, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 }
-                startActivity(intent)
+                startActivity(mainIntent)
             }
         } finally {
             finish()
         }
+    }
+
+    companion object {
+        const val EXTRA_SOURCE = "io.github.mangi.eta.extra.NOTIFICATION_SOURCE"
+        const val SOURCE_OVERLAY = "overlay"
+        const val SOURCE_MAIN = "main"
     }
 }

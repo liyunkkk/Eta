@@ -42,6 +42,8 @@ import io.github.mangi.eta.agent.runtime.AgentEvent
 import io.github.mangi.eta.agent.runtime.AgentExternalArchivePayload
 import io.github.mangi.eta.agent.runtime.AgentRuntimeClient
 import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
+import io.github.mangi.eta.agent.runtime.AgentExecutionService
+import io.github.mangi.eta.agent.runtime.AgentNotificationTrampolineActivity
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.ui.app.AgentConversationStore
 import io.github.mangi.eta.ui.MainActivity
@@ -156,6 +158,10 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                 "Eta assistant overlay permission is missing"
             }
             stopSelf()
+            return
+        }
+        if (activeRunId != null || (windowView == null && uiState.messages.isNotEmpty())) {
+            showWindow()
             return
         }
         cancelCurrentRun()
@@ -336,7 +342,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             isFocusableInTouchMode = true
             setViewTreeLifecycleOwner(this@EtaAssistantOverlayService)
             setViewTreeSavedStateRegistryOwner(this@EtaAssistantOverlayService)
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent(content)
         }
 
@@ -476,12 +482,22 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                 hiddenForForegroundOperation
             }
             runtimeClient.ackResult(runId)
-            if (shouldStopAfterResult) {
-                withContext(Dispatchers.Main.immediate) {
-                    if (activeRunId == null) {
-                        removeWindow()
-                        stopSelf()
+            withContext(Dispatchers.Main.immediate) {
+                if (windowView == null && result.error != SYNTHETIC_STOPPED && result.error != LEGACY_STOPPED_ERROR) {
+                    val title = normalized.take(30)
+                    val contentText = if (result.ok) {
+                        result.content.trim().take(200)
+                    } else {
+                        result.error.orEmpty()
                     }
+                    AgentExecutionService.postCompletionNotification(
+                        context = this@EtaAssistantOverlayService,
+                        runId = runId,
+                        title = title,
+                        content = contentText,
+                        isError = !result.ok,
+                        source = AgentNotificationTrampolineActivity.SOURCE_OVERLAY,
+                    )
                 }
             }
         }
@@ -902,9 +918,13 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         entryCaptureJob?.cancel()
         entryCaptureJob = null
         screenContextAttachment = null
-        cancelCurrentRun()
-        removeWindow()
-        stopSelf()
+        if (activeRunId != null) {
+            removeWindow()
+        } else {
+            cancelCurrentRun()
+            removeWindow()
+            stopSelf()
+        }
     }
 
     private fun openConversation() {
