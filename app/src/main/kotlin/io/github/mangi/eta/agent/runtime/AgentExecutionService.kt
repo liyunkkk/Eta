@@ -1,5 +1,4 @@
 package io.github.mangi.eta.agent.runtime
-
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,10 +10,10 @@ import android.content.pm.ServiceInfo
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import io.github.mangi.eta.R
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.core.safeLogType
-import io.github.mangi.eta.ui.MainActivity
 import java.util.concurrent.atomic.AtomicLong
 
 /** 只在用户任务存活期间持有前台执行生命周期；进程被系统停止后不重放任务。 */
@@ -88,22 +87,54 @@ internal class AgentExecutionService : Service() {
 
     private fun notification(): Notification {
         val open = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
+            this, 0, Intent(this, AgentNotificationTrampolineActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val stop = PendingIntent.getService(
             this, 1, Intent(this, AgentExecutionService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        return Notification.Builder(this, CHANNEL)
+
+        val state = executionState
+        val title = state.title ?: getString(R.string.execution_title)
+        val text = state.detail ?: getString(R.string.execution_summary, leases.count())
+        val subText = state.subtitle ?: getString(R.string.app_name)
+
+        val builder = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.execution_title))
-            .setContentText(getString(R.string.execution_summary, leases.count()))
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSubText(subText)
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .addAction(Notification.Action.Builder(null, getString(R.string.execution_stop), stop).build())
-            .build()
+
+        if (state.showChronometer && state.startedAtElapsedRealtime > 0L) {
+            val baseTimeMillis = System.currentTimeMillis() - (SystemClock.elapsedRealtime() - state.startedAtElapsedRealtime)
+            builder.setWhen(baseTimeMillis)
+            builder.setShowWhen(true)
+            builder.setUsesChronometer(true)
+        } else {
+            builder.setShowWhen(false)
+        }
+
+        val expanded = state.expandedSnippet?.takeIf { it.isNotBlank() }
+        if (expanded != null) {
+            builder.setStyle(
+                Notification.BigTextStyle()
+                    .setBigContentTitle(title)
+                    .bigText(expanded)
+                    .setSummaryText(subText),
+            )
+        }
+
+        // 小米 HyperOS / MIUI 焦点通知胶囊扩展
+        builder.extras.putBoolean("miui.focusNotification", true)
+        builder.extras.putBoolean("miui.enableFloat", false)
+        builder.extras.putString("miui.focusNotification.subTitle", subText)
+
+        return builder.build()
     }
 
     companion object {
@@ -114,6 +145,17 @@ internal class AgentExecutionService : Service() {
         private val ownerSequence = AtomicLong()
         private val mainHandler = Handler(Looper.getMainLooper())
         @Volatile private var instance: AgentExecutionService? = null
+        @Volatile private var executionState = AgentExecutionState()
+
+        fun updateExecutionState(state: AgentExecutionState) {
+            executionState = state
+            mainHandler.post { instance?.refreshNotification() }
+        }
+
+        fun resetExecutionState() {
+            executionState = AgentExecutionState()
+            mainHandler.post { instance?.refreshNotification() }
+        }
 
         /** 必须从有效的用户入口取得引用，再创建会话或子进程；失败时调用方不启动任务。 */
         fun acquire(
@@ -136,6 +178,9 @@ internal class AgentExecutionService : Service() {
 
         fun release(id: String) {
             leases.release(id)
+            if (leases.count() == 0) {
+                executionState = AgentExecutionState()
+            }
             mainHandler.post { instance?.refreshNotification() }
         }
     }

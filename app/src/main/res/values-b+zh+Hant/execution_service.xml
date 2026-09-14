@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="execution_channel">任務執行</string>
+    <string name="execution_title">Eta 正在運行</string>
+    <string name="execution_summary">%1$d 項任務正在運行，可返回 Eta 查看進度</string>
+    <string name="execution_stop">停止運行任務</string>
+    <string name="execution_phase_preparing">正在準備任務…</string>
+    <string name="execution_phase_preparing_detail">正在初始化執行環境</string>
+    <string name="execution_phase_thinking">正在深度思考…</string>
+    <string name="execution_phase_thinking_detail">正在梳理推導步驟</string>
+    <string name="execution_phase_tool">正在執行：%1$s</string>
+    <string name="execution_phase_tool_generic">正在執行外部操作</string>
+    <string name="execution_phase_generating">正在組織回覆…</string>
+    <string name="execution_phase_generating_detail">正在生成解答內容</string>
+</resources>

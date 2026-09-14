@@ -1101,6 +1101,8 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         @Volatile
         private var activeService: EtaAssistantOverlayService? = null
 
+        fun isServiceActive(): Boolean = activeService != null
+
         /**
          * Eta 自己拥有入口浮层，直接关闭并等待具体 View detach；不能按包名猜测，
          * 因为入口、Runtime 与结果浮层都属于同一个包。

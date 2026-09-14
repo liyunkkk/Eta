@@ -76,6 +76,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
 
     @Volatile
     private var activeSession: AgentRuntimeSession? = null
+    @Volatile private var executionNotificationTracker: AgentExecutionNotificationTracker? = null
     private var startRequestGeneration = 0L
     private var pendingStartRequest: PendingStartRequest? = null
 
@@ -358,10 +359,23 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             }
         }
 
+        val notificationTracker = AgentExecutionNotificationTracker(
+            context = this,
+            handler = mainHandler,
+            onStateChanged = { executionState ->
+                AgentExecutionService.updateExecutionState(executionState)
+            },
+        )
+        executionNotificationTracker = notificationTracker
         thread(name = "agent-runtime") {
             try {
                 executeRun(session, request)
             } finally {
+                notificationTracker.reset()
+                if (executionNotificationTracker === notificationTracker) {
+                    executionNotificationTracker = null
+                }
+                AgentExecutionService.resetExecutionState()
                 AgentExecutionService.release("run:${request.runId}")
             }
         }
@@ -412,6 +426,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         }
         mainHandler.post {
             if (activeSession !== session) return@post
+            executionNotificationTracker?.onEvent(event)
             if (
                 AgentOverlayVisibilityPolicy.shouldRecordForegroundExecution(
                     event,
