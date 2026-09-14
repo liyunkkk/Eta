@@ -27,13 +27,13 @@ class ProviderRequestHeadersTest {
     }
 
     @Test
-    fun customUserAgentOverridesDefaultButSessionAndAuthStayManaged() {
+    fun customUserAgentAndAuthorizationOverrideDefaultsWhileSessionStaysManaged() {
         val builder = Headers.Builder().add("Authorization", "Bearer test-key")
         ProviderRequestHeaders.mergeInto(
             builder, "https://opencode.ai/zen/go/v1",
             listOf(
                 CustomHeader("user-agent", "test-client"),
-                CustomHeader("Authorization", "bad"),
+                CustomHeader("Authorization", "Bearer custom-override-token"),
                 CustomHeader("X-OpenCode-Session", "fixed"),
             ),
             "conversation-1",
@@ -41,17 +41,26 @@ class ProviderRequestHeadersTest {
         val result = builder.build()
         assertEquals("test-client", result["User-Agent"])
         assertEquals(1, result.values("User-Agent").size)
-        assertEquals("Bearer test-key", result["Authorization"])
+        assertEquals("Bearer custom-override-token", result["Authorization"])
         assertNotEquals("fixed", result["x-opencode-session"])
     }
 
     @Test
     fun editorRejectsInvalidAndDuplicateHeadersWithoutEchoingValues() {
-        assertNull(CustomHeaderFilter.validationError(listOf(CustomHeader("User-Agent", "test-client"))))
+        assertNull(
+            CustomHeaderFilter.validationError(
+                listOf(
+                    CustomHeader("User-Agent", "test-client"),
+                    CustomHeader("Authorization", "Bearer custom"),
+                    CustomHeader("x-api-key", "secret-key"),
+                )
+            )
+        )
         listOf(
             listOf(CustomHeader("X-Test", "secret\r\nInjected: value")),
             listOf(CustomHeader("bad:name", "secret")),
-            listOf(CustomHeader("Authorization", "secret")),
+            listOf(CustomHeader("anthropic-version", "secret-version")),
+            listOf(CustomHeader("Host", "secret-host")),
             listOf(CustomHeader("X-Test", "1"), CustomHeader(" x-test ", "2")),
         ).forEach { headers ->
             val error = CustomHeaderFilter.validationError(headers)

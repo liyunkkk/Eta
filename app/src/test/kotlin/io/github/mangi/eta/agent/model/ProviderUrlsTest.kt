@@ -23,8 +23,28 @@ class ProviderUrlsTest {
             ProviderUrls.anthropicMessagesUrl("https://api.anthropic.com/")
         )
         assertEquals(
+            "https://api.anthropic.com/v1/messages",
+            ProviderUrls.anthropicMessagesUrl("https://api.anthropic.com/v1")
+        )
+        assertEquals(
+            "https://api.anthropic.com/v1/messages",
+            ProviderUrls.anthropicMessagesUrl("https://api.anthropic.com/v1/")
+        )
+        assertEquals(
+            "https://api.justworker.icu/v1/messages",
+            ProviderUrls.anthropicMessagesUrl("https://api.justworker.icu/v1")
+        )
+        assertEquals(
             "https://api.anthropic.com/v1/models",
             ProviderUrls.anthropicModelsUrl("https://api.anthropic.com")
+        )
+        assertEquals(
+            "https://api.anthropic.com/v1/models",
+            ProviderUrls.anthropicModelsUrl("https://api.anthropic.com/v1")
+        )
+        assertEquals(
+            "https://api.justworker.icu/v1/models",
+            ProviderUrls.anthropicModelsUrl("https://api.justworker.icu/v1/")
         )
     }
 }

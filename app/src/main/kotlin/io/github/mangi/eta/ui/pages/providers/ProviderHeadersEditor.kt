@@ -46,7 +46,7 @@ internal fun LazyListScope.providerHeadersEditor(
             val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f)
             BasicComponent(
                 title = if (headers.isEmpty()) "未设置" else "已设置 ${headers.size} 项",
-                summary = "可覆盖 User-Agent；认证与传输请求头由系统管理。",
+                summary = "可覆盖 User-Agent、Authorization 等请求头；传输字段由系统管理。",
                 endActions = {
                     Icon(
                         imageVector = Icons.Rounded.ExpandMore,
