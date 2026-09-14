@@ -26,16 +26,10 @@ class AgentExecutionNotificationTrackerTest {
         val single = "这是简单的一句话"
         assertEquals("这是简单的一句话", AgentExecutionNotificationTracker.extractSingleLinePreview(single))
 
-        val multiline = "第一行思路
-第二行思考
-最后一步推导完成"
+        val multiline = "第一行思路\n第二行思考\n最后一步推导完成"
         assertEquals("最后一步推导完成", AgentExecutionNotificationTracker.extractSingleLinePreview(multiline))
 
-        val multilineTrailingBlanks = "第一行思路
-正在分析问题
-
-   
-"
+        val multilineTrailingBlanks = "第一行思路\n正在分析问题\n\n   \n"
         assertEquals("正在分析问题", AgentExecutionNotificationTracker.extractSingleLinePreview(multilineTrailingBlanks))
     }
 
@@ -51,7 +45,7 @@ class AgentExecutionNotificationTrackerTest {
     fun testFormatToolPreview() {
         val withCmd = AgentExecutionNotificationTracker.formatToolPreview(
             command = "ls -la /sdcard",
-            argsPreview = "{"cmd": "ls -la /sdcard"}",
+            argsPreview = "{\"cmd\": \"ls -la /sdcard\"}",
         )
         assertEquals("ls -la /sdcard", withCmd)
 

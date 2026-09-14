@@ -49,8 +49,7 @@ internal class AgentExecutionNotificationTracker(
             val text = buffer.trim().toString()
             if (text.isEmpty()) return ""
             val lastNonEmptyLine = text.lines().lastOrNull { it.isNotBlank() } ?: text
-            val clean = lastNonEmptyLine.replace("
-", " ").replace("", " ").trim()
+            val clean = lastNonEmptyLine.replace("\n", " ").replace("\r", " ").trim()
             return if (clean.length > maxLength) {
                 "…" + clean.takeLast(maxLength)
             } else {
@@ -70,8 +69,7 @@ internal class AgentExecutionNotificationTracker(
         internal fun formatToolPreview(command: String?, argsPreview: String): String {
             val raw = if (!command.isNullOrBlank()) command.trim() else argsPreview.trim()
             if (raw.isBlank()) return ""
-            val clean = raw.replace("
-", " ").replace("", " ").trim()
+            val clean = raw.replace("\n", " ").replace("\r", " ").trim()
             return if (clean.length > MAX_SINGLE_LINE_CHARS) {
                 clean.take(MAX_SINGLE_LINE_CHARS) + "…"
             } else {
@@ -179,11 +177,9 @@ internal class AgentExecutionNotificationTracker(
                 val expandedText = buildString {
                     append(context.getString(R.string.execution_phase_tool, friendlyName))
                     if (event.command?.isNotBlank() == true) {
-                        append("
-$ ").append(event.command.trim())
+                        append("\n$ ").append(event.command.trim())
                     } else if (event.argsPreview.isNotBlank()) {
-                        append("
-").append(event.argsPreview.trim())
+                        append("\n").append(event.argsPreview.trim())
                     }
                 }
                 emitImmediate(
