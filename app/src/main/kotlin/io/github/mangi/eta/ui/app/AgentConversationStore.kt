@@ -185,7 +185,7 @@ internal object AgentConversationStore {
     private val ConversationMetadata.reasoningEffortValue: ReasoningEffort
         get() = ReasoningEffort.fromWireValue(reasoningEffort) ?: ReasoningEffort.DEFAULT
 
-    private fun AgentChatMessageUi.toEntityOrNull(
+    internal fun AgentChatMessageUi.toEntityOrNull(
         conversationId: String,
         sortIndex: Int,
     ): ConversationMessageEntity? =
@@ -265,7 +265,7 @@ internal object AgentConversationStore {
             else -> null
         }
 
-    private fun ConversationMessageEntity.toMessageOrNull(): AgentChatMessageUi? =
+    internal fun ConversationMessageEntity.toMessageOrNull(): AgentChatMessageUi? =
         when (type) {
             TYPE_USER -> UserMessageUi(
                 id = id,
@@ -371,5 +371,91 @@ internal object AgentConversationStore {
     private const val TYPE_TOOL = "tool"
     private const val TYPE_TOOL_SUMMARY = "tool_summary"
     private const val MESSAGE_LOAD_PAGE_SIZE = 128
+
+    data class AssistantConversationData(
+        val conversationId: String,
+        val title: String,
+        val messages: List<AgentChatMessageUi>,
+        val history: List<AgentModelClient.ConversationMessage>,
+    )
+
+    suspend fun loadAssistantConversation(context: Context, conversationId: String? = null): AssistantConversationData? {
+        val dao = EtaDatabase.get(context.applicationContext).conversationDao()
+        val targetId = conversationId
+            ?: dao.state()?.selectedConversationId
+            ?: dao.conversationMetadataPage(limit = 1, offset = 0).firstOrNull()?.id
+            ?: return null
+
+        val metadata = dao.conversationMetadata(targetId) ?: return null
+        val messageEntities = dao.messagesPage(targetId, limit = 100, offset = 0)
+            .sortedBy { it.sortIndex }
+        val messages = messageEntities.mapNotNull { it.toMessageOrNull() }
+        val checkpoint = dao.contextCheckpoint(targetId)
+        val history = AgentConversationCodec.decodeTranscript(checkpoint?.historyJson)
+            .ifEmpty {
+                messageEntities.toLegacyHistory()
+            }
+        return AssistantConversationData(
+            conversationId = targetId,
+            title = metadata.title.takeUnless { it == LEGACY_UNNAMED_TITLE }.orEmpty(),
+            messages = messages,
+            history = history,
+        )
+    }
+
+    suspend fun saveAssistantConversation(
+        context: Context,
+        conversationId: String,
+        title: String,
+        messages: List<AgentChatMessageUi>,
+        history: List<AgentModelClient.ConversationMessage>,
+    ) {
+        val appContext = context.applicationContext
+        saveMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val dao = EtaDatabase.get(appContext).conversationDao()
+                val now = System.currentTimeMillis()
+                val existing = dao.conversationEntity(conversationId)
+                val conversationEntity = ConversationEntity(
+                    id = conversationId,
+                    title = title.ifBlank { existing?.title.orEmpty() },
+                    thinkingEnabled = existing?.thinkingEnabled ?: false,
+                    reasoningEffort = existing?.reasoningEffort ?: ReasoningEffort.DEFAULT.wireValue,
+                    appliedRuntimeRunIdsJson = existing?.appliedRuntimeRunIdsJson ?: "[]",
+                    roleplayJson = existing?.roleplayJson.orEmpty(),
+                    revisionsJson = existing?.revisionsJson.orEmpty(),
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now,
+                )
+                dao.insertConversationRow(conversationEntity)
+                dao.deleteMessagesForConversation(conversationId)
+                val messageEntities = messages.mapIndexedNotNull { index, msg ->
+                    msg.toEntityOrNull(conversationId, index)
+                }
+                dao.insertMessages(messageEntities)
+                val checkpoint = ConversationContextCheckpointEntity(
+                    conversationId = conversationId,
+                    historyJson = AgentConversationCodec.encodeConversationCheckpoint(history),
+                    journalJson = AgentConversationCodec.encodeTranscriptForStorage(history),
+                )
+                dao.insertContextCheckpointRow(checkpoint)
+                dao.insertState(ConversationStateEntity(selectedConversationId = conversationId))
+            }
+        }
+    }
+
+
+    suspend fun selectConversation(context: Context, conversationId: String) {
+        withContext(Dispatchers.IO) {
+            EtaDatabase.get(context.applicationContext).conversationDao().insertState(ConversationStateEntity(selectedConversationId = conversationId))
+        }
+    }
+
+    suspend fun loadRecentConversations(context: Context, limit: Int = 30): List<ConversationMetadata> {
+        return withContext(Dispatchers.IO) {
+            EtaDatabase.get(context.applicationContext).conversationDao().conversationsPage(limit = limit, offset = 0)
+        }
+    }
+
     private const val LEGACY_UNNAMED_TITLE = "新对话"
 }

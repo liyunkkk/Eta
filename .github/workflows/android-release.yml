@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+      - "feat/*"
+      - "sync-*"
   workflow_dispatch:
 
 permissions:
@@ -99,12 +101,13 @@ jobs:
           echo "enabled=true" >> "$GITHUB_OUTPUT"
           echo "temporary=false" >> "$GITHUB_OUTPUT"
 
-      - name: 运行 Provider 定向单元测试
+      - name: 运行定向单元测试
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
           :app:testDebugUnitTest
           --tests io.github.mangi.eta.agent.model.ProviderRequestHeadersTest
           --tests io.github.mangi.eta.agent.model.ProviderUrlsTest
+          --tests io.github.mangi.eta.ui.app.AgentConversationStoreTest
 
       - name: 构建 Debug APK
         run: >-

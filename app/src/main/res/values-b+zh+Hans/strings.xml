@@ -668,6 +668,10 @@
   <string name="voice_screen_remove">移除当前屏幕截图</string>
   <string name="voice_input_hint">发消息问 Eta…</string>
   <string name="voice_send">发送</string>
+  <string name="voice_conversation_history">历史会话</string>
+  <string name="voice_new_conversation">新建对话</string>
+  <string name="voice_new_conversation_hint">新对话</string>
+  <string name="voice_empty_history">暂无历史会话</string>
   <string name="injected_reasoning">Eta 正在思考…</string>
   <string name="injected_executing">Eta 正在执行任务…</string>
   <string name="injected_completed">Eta 已完成本轮任务</string>

@@ -29,6 +29,15 @@ internal interface ConversationDao : ChunkedTextDao {
     @Transaction
     suspend fun conversationsPage(limit: Int, offset: Int): List<ConversationMetadata> =
         conversationMetadataPage(limit, offset).map { restoreMetadata(it) }
+    @Query(
+        "SELECT id, title, thinking_enabled, reasoning_effort, " +
+            "applied_runtime_run_ids_json, roleplay_json, revisions_json, created_at, updated_at " +
+            "FROM conversations WHERE id = :conversationId"
+    )
+    suspend fun conversationMetadataRow(conversationId: String): ConversationMetadata?
+    @Transaction
+    suspend fun conversationMetadata(conversationId: String): ConversationMetadata? =
+        conversationMetadataRow(conversationId)?.let { restoreMetadata(it) }
 
     suspend fun restoreMetadata(row: ConversationMetadata) = row.copy(
         appliedRuntimeRunIdsJson = restoreText("conversations", row.id, "runs", row.appliedRuntimeRunIdsJson),
@@ -55,6 +64,16 @@ internal interface ConversationDao : ChunkedTextDao {
 
     @Transaction
     suspend fun conversationEntities(): List<ConversationEntity> = conversationEntityRows().map { row ->
+        row.copy(
+            appliedRuntimeRunIdsJson = restoreText("conversations", row.id, "runs", row.appliedRuntimeRunIdsJson),
+            roleplayJson = restoreText("conversations", row.id, "roleplay", row.roleplayJson),
+            revisionsJson = restoreText("conversations", row.id, "revisions", row.revisionsJson),
+        )
+    }
+    @Query("SELECT * FROM conversations WHERE id = :conversationId")
+    suspend fun conversationEntityRow(conversationId: String): ConversationEntity?
+    @Transaction
+    suspend fun conversationEntity(conversationId: String): ConversationEntity? = conversationEntityRow(conversationId)?.let { row ->
         row.copy(
             appliedRuntimeRunIdsJson = restoreText("conversations", row.id, "runs", row.appliedRuntimeRunIdsJson),
             roleplayJson = restoreText("conversations", row.id, "roleplay", row.roleplayJson),
@@ -149,6 +168,8 @@ internal interface ConversationDao : ChunkedTextDao {
 
     @Query("DELETE FROM conversation_messages")
     suspend fun deleteMessages()
+    @Query("DELETE FROM conversation_messages WHERE conversation_id = :conversationId")
+    suspend fun deleteMessagesForConversation(conversationId: String)
 
     @Query("DELETE FROM conversation_context_checkpoints")
     suspend fun deleteContextCheckpoints()

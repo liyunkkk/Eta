@@ -656,6 +656,10 @@
   <string name="voice_screen_remove">移除目前畫面</string>
   <string name="voice_input_hint">傳訊息給 Eta…</string>
   <string name="voice_send">傳送</string>
+  <string name="voice_conversation_history">歷史對話</string>
+  <string name="voice_new_conversation">新增對話</string>
+  <string name="voice_new_conversation_hint">新對話</string>
+  <string name="voice_empty_history">暫無歷史對話</string>
   <string name="injected_reasoning">Eta 正在思考…</string>
   <string name="injected_executing">Eta 正在執行任務…</string>
   <string name="injected_completed">Eta 已完成本次任務</string>

@@ -1,6 +1,19 @@
 package io.github.mangi.eta.agent.voice
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -110,11 +123,22 @@ internal enum class EtaVoicePhase {
     ERROR,
 }
 
+internal data class AssistantConversationItem(
+    val id: String,
+    val title: String,
+    val updatedAt: Long = 0L,
+    val isCurrent: Boolean = false,
+)
+
 internal data class EtaVoiceUiState(
     val messages: List<AgentChatMessageUi> = emptyList(),
     val phase: EtaVoicePhase = EtaVoicePhase.READY,
     val status: EtaVoiceStatus = EtaVoiceStatus.InputRequest,
     val screenContext: EtaScreenContextUiState = EtaScreenContextUiState(),
+    val conversationId: String? = null,
+    val conversationTitle: String = "",
+    val historyConversations: List<AssistantConversationItem> = emptyList(),
+    val isHistoryMenuVisible: Boolean = false,
 )
 
 internal sealed interface EtaVoiceStatus {
@@ -210,6 +234,9 @@ internal fun EtaVoicePanel(
     onInputChange: (String) -> Unit,
     onScreenContextSelect: () -> Unit,
     onScreenContextRemove: () -> Unit,
+    onToggleHistoryMenu: () -> Unit,
+    onSelectConversation: (String) -> Unit,
+    onNewConversation: () -> Unit,
     onSubmit: () -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
@@ -287,6 +314,9 @@ internal fun EtaVoicePanel(
                 onInputChange = onInputChange,
                 onScreenContextSelect = onScreenContextSelect,
                 onScreenContextRemove = onScreenContextRemove,
+                onToggleHistoryMenu = onToggleHistoryMenu,
+                onSelectConversation = onSelectConversation,
+                onNewConversation = onNewConversation,
                 onSubmit = {
                     keyboard?.hide()
                     onSubmit()
@@ -313,6 +343,9 @@ private fun BoxScope.AssistantPanel(
     onInputChange: (String) -> Unit,
     onScreenContextSelect: () -> Unit,
     onScreenContextRemove: () -> Unit,
+    onToggleHistoryMenu: () -> Unit,
+    onSelectConversation: (String) -> Unit,
+    onNewConversation: () -> Unit,
     onSubmit: () -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
@@ -563,6 +596,23 @@ private fun BoxScope.AssistantPanel(
                 }
             }
         }
+        AnimatedVisibility(
+            visible = state.isHistoryMenuVisible,
+            enter = fadeIn(tween(180, easing = LinearOutSlowInEasing)) +
+                slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 4 },
+            exit = fadeOut(tween(140, easing = FastOutSlowInEasing)) +
+                slideOutVertically(tween(160, easing = FastOutSlowInEasing)) { it / 4 },
+        ) {
+            AssistantHistorySheet(
+                state = state,
+                colors = colors,
+                onSelectConversation = onSelectConversation,
+                onNewConversation = onNewConversation,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
         AssistantComposer(
             state = state,
             input = input,
@@ -571,6 +621,8 @@ private fun BoxScope.AssistantPanel(
             onInputChange = onInputChange,
             onScreenContextSelect = onScreenContextSelect,
             onScreenContextRemove = onScreenContextRemove,
+            onToggleHistoryMenu = onToggleHistoryMenu,
+            onNewConversation = onNewConversation,
             onSubmit = onSubmit,
             onStop = onStop,
             modifier = Modifier
@@ -594,6 +646,8 @@ private fun AssistantComposer(
     onInputChange: (String) -> Unit,
     onScreenContextSelect: () -> Unit,
     onScreenContextRemove: () -> Unit,
+    onToggleHistoryMenu: () -> Unit,
+    onNewConversation: () -> Unit,
     onSubmit: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
@@ -603,16 +657,34 @@ private fun AssistantComposer(
             animationSpec = folmeSpring(damping = 0.92f, response = 0.34f),
         ),
     ) {
-        ScreenContextAttachment(
-            state = state.screenContext,
-            enabled = state.phase != EtaVoicePhase.PROCESSING,
-            colors = colors,
-            onSelect = onScreenContextSelect,
-            onRemove = onScreenContextRemove,
-        )
-        if (state.screenContext.phase != EtaScreenContextPhase.CONSUMED) {
-            Spacer(Modifier.height(7.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ConversationCapsule(
+                title = state.conversationTitle.ifBlank { stringResource(R.string.voice_new_conversation_hint) },
+                isMenuVisible = state.isHistoryMenuVisible,
+                enabled = state.phase != EtaVoicePhase.PROCESSING,
+                colors = colors,
+                onClick = onToggleHistoryMenu,
+            )
+            NewConversationCapsule(
+                enabled = state.phase != EtaVoicePhase.PROCESSING,
+                colors = colors,
+                onClick = onNewConversation,
+            )
+            ScreenContextAttachment(
+                state = state.screenContext,
+                enabled = state.phase != EtaVoicePhase.PROCESSING,
+                colors = colors,
+                onSelect = onScreenContextSelect,
+                onRemove = onScreenContextRemove,
+            )
         }
+        Spacer(Modifier.height(7.dp))
         AssistantInputBar(
             state = state,
             input = input,
@@ -897,4 +969,210 @@ private fun assistantBaseHeightPx(
     return max(230f, estimatedDp)
         .times(density)
         .coerceAtMost(maxHeightPx * 0.68f)
+}
+
+
+@Composable
+private fun ConversationCapsule(
+    title: String,
+    isMenuVisible: Boolean,
+    enabled: Boolean,
+    colors: EtaVoicePanelColors,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .height(34.dp)
+            .squircleSurface(
+                color = colors.input.copy(alpha = 0.9f),
+                cornerRadius = 17.dp,
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.Chat,
+            contentDescription = null,
+            modifier = Modifier.size(15.dp),
+            tint = if (enabled) colors.inputPrimary else colors.inputTertiary,
+        )
+        Spacer(Modifier.size(6.dp))
+        Text(
+            text = title,
+            color = if (enabled) colors.inputPrimary else colors.inputSecondary,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 140.dp),
+        )
+        Spacer(Modifier.size(4.dp))
+        Icon(
+            imageVector = if (isMenuVisible) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = if (enabled) colors.inputSecondary else colors.inputTertiary,
+        )
+    }
+}
+
+@Composable
+private fun NewConversationCapsule(
+    enabled: Boolean,
+    colors: EtaVoicePanelColors,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .height(34.dp)
+            .squircleSurface(
+                color = colors.input.copy(alpha = 0.9f),
+                cornerRadius = 17.dp,
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = stringResource(R.string.voice_new_conversation),
+            modifier = Modifier.size(16.dp),
+            tint = if (enabled) colors.inputPrimary else colors.inputTertiary,
+        )
+    }
+}
+
+@Composable
+private fun AssistantHistorySheet(
+    state: EtaVoiceUiState,
+    colors: EtaVoicePanelColors,
+    onSelectConversation: (String) -> Unit,
+    onNewConversation: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .heightIn(max = 240.dp)
+            .squircleSurface(
+                color = colors.content,
+                cornerRadius = 20.dp,
+            )
+            .padding(vertical = 10.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.voice_conversation_history),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.inputPrimary,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onNewConversation)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                    tint = colors.inputPrimary,
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    text = stringResource(R.string.voice_new_conversation),
+                    fontSize = 12.sp,
+                    color = colors.inputPrimary,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.5.dp)
+                .background(colors.inputTertiary.copy(alpha = 0.2f)),
+        )
+        if (state.historyConversations.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.voice_empty_history),
+                    fontSize = 13.sp,
+                    color = colors.inputTertiary,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 180.dp),
+            ) {
+                items(state.historyConversations, key = { it.id }) {
+                    item ->
+                    HistoryConversationItemRow(
+                        item = item,
+                        colors = colors,
+                        onSelect = { onSelectConversation(item.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryConversationItemRow(
+    item: AssistantConversationItem,
+    colors: EtaVoicePanelColors,
+    onSelect: () -> Unit,
+) {
+    val isSelected = item.isCurrent
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .squircleSurface(
+                color = if (isSelected) colors.input.copy(alpha = 0.85f) else Color.Transparent,
+                cornerRadius = 12.dp,
+            )
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.Chat,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = if (isSelected) colors.inputPrimary else colors.inputSecondary,
+        )
+        Spacer(Modifier.size(10.dp))
+        Text(
+            text = item.title.ifBlank { stringResource(R.string.voice_new_conversation_hint) },
+            fontSize = 13.sp,
+            color = if (isSelected) colors.inputPrimary else colors.inputSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (isSelected) {
+            Spacer(Modifier.size(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = colors.inputPrimary,
+            )
+        }
+    }
 }

@@ -473,4 +473,54 @@ class AgentConversationStoreTest {
         assertTrue(snapshot.conversationsById.isEmpty())
         assertEquals(null, snapshot.selectedConversationId)
     }
+
+    @Test
+    fun assistantConversationDefaultContinuationAndHistorySwitching() = runBlocking {
+        val userMsg = UserMessageUi(id = "user-1", content = "北京天气怎么样")
+        val asstMsg = AgentMessageUi(id = "asst-1", content = "今天晴朗，微风。", isStreaming = false)
+        val historyMsg = AgentModelClient.ConversationMessage(role = "user", content = "北京天气怎么样")
+
+        AgentConversationStore.saveAssistantConversation(
+            context = context,
+            conversationId = "conv-weather",
+            title = "北京天气",
+            messages = listOf(userMsg, asstMsg),
+            history = listOf(historyMsg),
+        )
+
+        // 验证默认自动续接上次对话
+        val restored = AgentConversationStore.loadAssistantConversation(context)
+        assertEquals("conv-weather", restored?.conversationId)
+        assertEquals("北京天气", restored?.title)
+        assertEquals(2, restored?.messages?.size)
+        assertEquals("北京天气怎么样", (restored?.messages?.get(0) as UserMessageUi).content)
+        assertEquals("今天晴朗，微风。", (restored?.messages?.get(1) as AgentMessageUi).content)
+        assertEquals(1, restored?.history?.size)
+
+        // 存储第二个会话
+        val userMsg2 = UserMessageUi(id = "user-2", content = "讲个笑话")
+        AgentConversationStore.saveAssistantConversation(
+            context = context,
+            conversationId = "conv-joke",
+            title = "讲笑话",
+            messages = listOf(userMsg2),
+            history = listOf(AgentModelClient.ConversationMessage(role = "user", content = "讲个笑话")),
+        )
+
+        // 此时默认续接最新的会话 conv-joke
+        val latest = AgentConversationStore.loadAssistantConversation(context)
+        assertEquals("conv-joke", latest?.conversationId)
+
+        // 切换历史对话到 conv-weather
+        AgentConversationStore.selectConversation(context, "conv-weather")
+        val switched = AgentConversationStore.loadAssistantConversation(context)
+        assertEquals("conv-weather", switched?.conversationId)
+
+        // 验证历史列表
+        val recent = AgentConversationStore.loadRecentConversations(context)
+        assertEquals(2, recent.size)
+        assertTrue(recent.any { it.id == "conv-weather" && it.title == "北京天气" })
+        assertTrue(recent.any { it.id == "conv-joke" && it.title == "讲笑话" })
+    }
+
 }

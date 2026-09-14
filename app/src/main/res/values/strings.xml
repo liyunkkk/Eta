@@ -300,6 +300,10 @@
   <string name="voice_screen_remove">Remove current screen</string>
   <string name="voice_input_hint">Message Eta…</string>
   <string name="voice_send">Send</string>
+  <string name="voice_conversation_history">Conversations</string>
+  <string name="voice_new_conversation">New conversation</string>
+  <string name="voice_new_conversation_hint">New Chat</string>
+  <string name="voice_empty_history">No history conversations</string>
   <string name="ui_core_memory_user_name_long_term_preferences_aa6ff9"># core memory
 - User name:
 - Long-term preferences:</string>
