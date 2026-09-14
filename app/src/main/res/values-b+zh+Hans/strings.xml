@@ -29,6 +29,7 @@
   <string name="action_import">导入</string>
   <string name="action_reinstall">重新安装</string>
   <string name="action_settings">设置</string>
+  <string name="action_edit_model_providers">编辑模型提供商</string>
   <string name="action_new_conversation">新建对话</string>
   <string name="action_conversation_history">会话历史</string>
   <string name="action_more">更多选项</string>

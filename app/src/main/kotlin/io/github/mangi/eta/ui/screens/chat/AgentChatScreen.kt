@@ -56,6 +56,7 @@ internal fun AgentChatScreen(
             },
             onRunTraceClick = { /* 对话页暂不做 Run trace 展开 */ },
             onOpenBrowser = { onAction(AgentChatAction.OpenBrowser) },
+            onOpenModelProviders = { onAction(AgentChatAction.OpenModelProviders) },
             modifier = modifier,
         )
     }

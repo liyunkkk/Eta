@@ -28,6 +28,7 @@
   <string name="action_import">匯入</string>
   <string name="action_reinstall">重新安裝</string>
   <string name="action_settings">設定</string>
+  <string name="action_edit_model_providers">編輯模型供應商</string>
   <string name="action_new_conversation">新增對話</string>
   <string name="action_conversation_history">對話記錄</string>
   <string name="action_more">更多選項</string>

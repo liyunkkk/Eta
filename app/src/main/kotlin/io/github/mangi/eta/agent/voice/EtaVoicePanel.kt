@@ -260,8 +260,10 @@ internal fun EtaVoicePanel(
     LaunchedEffect(inputFocusRequestKey) {
         if (inputFocusRequestKey >= 0 && state.phase != EtaVoicePhase.PROCESSING) {
             delay(120)
-            focusRequester.requestFocus()
-            keyboard?.show()
+            runCatching {
+                focusRequester.requestFocus()
+                keyboard?.show()
+            }
         }
     }
 
@@ -564,35 +566,35 @@ private fun BoxScope.AssistantPanel(
                 )
             },
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(with(density) { visibleSheetHeightPx.toDp() })
-                .nestedScroll(nestedScrollConnection),
-        ) {
-            DragHandle(
-                colors = colors,
-                modifier = Modifier.pointerInput(baseContentHeightPx, maxContentHeightPx) {
-                    detectVerticalDragGestures(
-                        onDragStart = { draggedHeightPx = currentAnimatedHeight.value },
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            dragBy(dragAmount)
-                        },
-                        onDragEnd = { finishDrag() },
-                        onDragCancel = { finishDrag() },
-                    )
-                },
-            )
-            Box(
+        if (hasMessages && visibleSheetHeightPx > 0f) {
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .graphicsLayer {
-                        alpha = messageRevealProgress.value
-                        translationY = (1f - messageRevealProgress.value) * messageRevealOffsetPx
-                    },
+                    .fillMaxWidth()
+                    .height(with(density) { visibleSheetHeightPx.toDp() })
+                    .nestedScroll(nestedScrollConnection),
             ) {
-                if (hasMessages) {
+                DragHandle(
+                    colors = colors,
+                    modifier = Modifier.pointerInput(baseContentHeightPx, maxContentHeightPx) {
+                        detectVerticalDragGestures(
+                            onDragStart = { draggedHeightPx = currentAnimatedHeight.value },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                dragBy(dragAmount)
+                            },
+                            onDragEnd = { finishDrag() },
+                            onDragCancel = { finishDrag() },
+                        )
+                    },
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .graphicsLayer {
+                            alpha = messageRevealProgress.value
+                            translationY = (1f - messageRevealProgress.value) * messageRevealOffsetPx
+                        },
+                ) {
                     AgentConversationMessages(
                         visibleMessages = state.messages,
                         scrollState = listState,

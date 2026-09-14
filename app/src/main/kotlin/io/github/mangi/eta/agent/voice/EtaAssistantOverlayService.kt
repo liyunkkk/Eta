@@ -777,8 +777,6 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             runMessageProjector.clearRun(runId)
             updateSoftInput(visible = true)
             inputFocusRequestKey++
-        } else {
-            dismissAndStop()
         }
     }
 
@@ -1073,7 +1071,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     }
 
     private fun newConversation() {
-        stopCurrentRun()
+        cancelCurrentRun()
         currentConversationId = null
         conversationHistory = emptyList()
         uiState = uiState.copy(

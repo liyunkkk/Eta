@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,12 +75,13 @@ internal fun AgentModelPickerButton(
     popupAnchorTopPx: Int,
     popupMaxHeight: Dp,
     onModelSelected: (String) -> Unit,
+    onOpenModelProviders: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showPopup by remember { mutableStateOf(false) }
     var expandedProviderIds by remember { mutableStateOf(emptySet<String>()) }
     val selected = state.selectedModel
-    val enabled = !isStreaming && !state.isChanging && state.providerGroups.isNotEmpty()
+    val enabled = !isStreaming && !state.isChanging
     LaunchedEffect(enabled) {
         if (!enabled) showPopup = false
     }
@@ -134,6 +137,10 @@ internal fun AgentModelPickerButton(
                     showPopup = false
                     onModelSelected(modelId)
                 },
+                onOpenModelProviders = {
+                    showPopup = false
+                    onOpenModelProviders()
+                },
             )
         }
     }
@@ -145,6 +152,7 @@ private fun ModelPickerPopupContent(
     expandedProviderIds: Set<String>,
     onProviderExpandedChange: (String, Boolean) -> Unit,
     onModelSelected: (String) -> Unit,
+    onOpenModelProviders: () -> Unit,
 ) {
     ListPopupColumn {
         state.providerGroups.forEachIndexed { groupIndex, group ->
@@ -169,6 +177,52 @@ private fun ModelPickerPopupContent(
                 }
             }
         }
+        if (state.providerGroups.isNotEmpty()) {
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+        }
+        ModelProviderManagementRow(
+            onClick = onOpenModelProviders,
+        )
+    }
+}
+
+@Composable
+private fun ModelProviderManagementRow(
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .squircleSurface(
+                color = Color.Transparent,
+                cornerRadius = 12.dp,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Tune,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MiuixTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.action_edit_model_providers),
+            style = MiuixTheme.textStyles.body2,
+            color = MiuixTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+        )
     }
 }
 

@@ -30,6 +30,7 @@
   <string name="action_reinstall">Reinstall</string>
   <string name="action_regenerate">Regenerate</string>
   <string name="action_settings">Settings</string>
+  <string name="action_edit_model_providers">Edit model providers</string>
   <string name="action_new_conversation">New conversation</string>
   <string name="action_conversation_history">Conversation history</string>
   <string name="action_more">More options</string>

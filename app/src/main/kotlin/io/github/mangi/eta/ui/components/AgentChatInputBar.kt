@@ -126,6 +126,7 @@ internal fun AgentChatInputBar(
     onAttachFilePath: (String) -> Unit,
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
+    onOpenModelProviders: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -327,6 +328,7 @@ internal fun AgentChatInputBar(
                             popupAnchorTopPx = inputContainerTopPx,
                             popupMaxHeight = thinkingPopupMaxHeight,
                             onModelSelected = onModelSelected,
+                            onOpenModelProviders = onOpenModelProviders,
                         )
 
                         IconButton(

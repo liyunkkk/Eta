@@ -334,6 +334,7 @@ fun AgentAppRoot(
                                 AgentHomeAction.OpenPermissions -> pushRoute(AppRoute.Permissions)
                                 AgentHomeAction.OpenSystemEnhance -> pushRoute(AppRoute.SystemEnhance)
                                 AgentHomeAction.OpenSettings -> pushRoute(AppRoute.Settings)
+                                AgentHomeAction.OpenModelProviders -> pushRoute(AppRoute.ModelProviders)
                                 AgentHomeAction.OpenBrowser -> pushRoute(AppRoute.Browser)
                                 AgentHomeAction.ExpandRunTrace -> Unit
                             }
@@ -358,6 +359,7 @@ fun AgentAppRoot(
                                 is AgentChatAction.SubmitMessage -> { requestExecutionNotifications(); agentState.sendCurrentMessage(action.text) }
                                 AgentChatAction.StopRun -> agentState.stopCurrentRun()
                                 AgentChatAction.OpenBrowser -> pushRoute(AppRoute.Browser)
+                                AgentChatAction.OpenModelProviders -> pushRoute(AppRoute.ModelProviders)
                                 is AgentChatAction.ImageAttached -> agentState.attachImage(action.uri)
                                 is AgentChatAction.RemoveImage -> agentState.removePendingImage(action.id)
                                 is AgentChatAction.FilesAttached -> agentState.attachFiles(action.uris)
