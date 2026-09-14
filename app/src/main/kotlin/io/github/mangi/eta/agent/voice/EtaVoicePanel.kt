@@ -368,6 +368,15 @@ private fun BoxScope.AssistantPanel(
     val dismissThresholdPx = with(density) { 92.dp.toPx() }
     val handoffVelocityPx = with(density) { 900.dp.toPx() }
     val hasMessages = state.messages.isNotEmpty()
+    LaunchedEffect(hasMessages) {
+        if (!hasMessages) {
+            draggedHeightPx = null
+            dismissPullPx = 0f
+            handoffPullPx = 0f
+            directHandoffPullPx = 0f
+            handoffRunning = false
+        }
+    }
     val targetHeightPx = if (hasMessages) {
         settledHeightPx.coerceIn(baseContentHeightPx, maxContentHeightPx)
     } else {
