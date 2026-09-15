@@ -102,7 +102,7 @@ import io.github.mangi.eta.agent.media.AgentImageCodec
 import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.ui.components.AgentChatInputBar
 import io.github.mangi.eta.ui.components.AgentConversationMessages
-import io.github.mangi.eta.ui.components.folmeSpring
+import io.github.mangi.eta.ui.components.rememberDataUrlBitmap
 import io.github.mangi.eta.ui.model.AgentChatMessageUi
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.AgentMessageUi
@@ -117,10 +117,14 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.anim.folmeSpring
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleClip
+import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal enum class EtaVoicePhase {
