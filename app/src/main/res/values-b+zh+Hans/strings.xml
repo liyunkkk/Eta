@@ -1191,7 +1191,6 @@
   <string name="tag_translation_model">屏幕翻译</string>
   <string name="tag_default_chat_model">默认对话</string>
   <string name="select_translation_model_dialog_title">选择屏幕翻译模型</string>
-<
   <string name="functional_model_set_as_chat">设为默认主对话模型</string>
   <string name="functional_model_set_as_translation">设为屏幕翻译模型</string>
   <string name="functional_model_current_chat">当前主对话模型</string>

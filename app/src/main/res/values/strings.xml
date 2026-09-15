@@ -1208,7 +1208,6 @@
   <string name="tag_translation_model">Screen Translation</string>
   <string name="tag_default_chat_model">Default Chat</string>
   <string name="select_translation_model_dialog_title">Select Screen Translation Model</string>
-<
   <string name="functional_model_set_as_chat">Set as Default Chat Model</string>
   <string name="functional_model_set_as_translation">Set as Screen Translation Model</string>
   <string name="functional_model_current_chat">Current Chat Model</string>
