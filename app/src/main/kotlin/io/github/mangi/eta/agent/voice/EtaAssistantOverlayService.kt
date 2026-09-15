@@ -3,9 +3,11 @@ package io.github.mangi.eta.agent.voice
 import android.app.Service
 import android.app.ActivityOptions
 import android.app.PendingIntent
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -15,6 +17,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.runtime.Composable
@@ -34,25 +37,39 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import io.github.mangi.eta.EtaApp
+import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.accessibility.AgentAccessibilityService
 import io.github.mangi.eta.agent.media.AgentImageCodec
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.agent.overlay.AgentOverlayVisibilityPolicy
 import io.github.mangi.eta.agent.runtime.AgentEvent
 import io.github.mangi.eta.agent.runtime.AgentExternalArchivePayload
+import io.github.mangi.eta.agent.runtime.AgentFileReferenceGateway
+import io.github.mangi.eta.agent.runtime.AgentFileReferenceKind
+import io.github.mangi.eta.agent.runtime.AgentFileReferencePolicy
+import io.github.mangi.eta.agent.runtime.AgentFileReferencePromptCodec
 import io.github.mangi.eta.agent.runtime.AgentRuntimeClient
 import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
 import io.github.mangi.eta.agent.runtime.AgentExecutionService
 import io.github.mangi.eta.agent.runtime.AgentNotificationTrampolineActivity
 import io.github.mangi.eta.core.AndroidAgentLogger
-import io.github.mangi.eta.ui.app.AgentConversationStore
+import io.github.mangi.eta.data.model.AppearanceSettings
+import io.github.mangi.eta.data.model.ModelReasoningCapabilities
+import io.github.mangi.eta.data.model.ReasoningEffort
+import io.github.mangi.eta.data.repository.AppearanceSettingsRepository
+import io.github.mangi.eta.data.repository.ProviderRepository
+import io.github.mangi.eta.data.repository.RuntimeConfigRepository
 import io.github.mangi.eta.ui.MainActivity
 import io.github.mangi.eta.ui.app.AgentAppTheme
-import io.github.mangi.eta.data.model.AppearanceSettings
-import io.github.mangi.eta.data.repository.AppearanceSettingsRepository
+import io.github.mangi.eta.ui.app.AgentConversationStore
 import io.github.mangi.eta.ui.app.AgentRunMessageProjector
 import io.github.mangi.eta.ui.model.AgentChatMessageUi
 import io.github.mangi.eta.ui.model.AgentMessageUi
+import io.github.mangi.eta.ui.model.AgentModelPickerProjector
+import io.github.mangi.eta.ui.model.AgentModelPickerUiState
+import io.github.mangi.eta.ui.model.PendingFileReferenceUi
+import io.github.mangi.eta.ui.model.PendingImageUi
 import io.github.mangi.eta.ui.model.ThinkingMessageUi
 import io.github.mangi.eta.ui.model.SystemNoticeCode
 import io.github.mangi.eta.ui.model.SystemNoticeMessageUi
@@ -64,13 +81,17 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 
@@ -113,6 +134,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     private var inputText by mutableStateOf("")
     private var inputFocusRequestKey by mutableIntStateOf(-1)
     private var uiState by mutableStateOf(EtaVoiceUiState())
+    private var currentReasoningCapabilities: ModelReasoningCapabilities? = null
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val savedStateRegistry: SavedStateRegistry
@@ -125,6 +147,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        observeRuntimeSelection()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -286,7 +309,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                         onToggleHistoryMenu = ::toggleHistoryMenu,
                         onSelectConversation = ::selectConversation,
                         onNewConversation = ::newConversation,
-                        onSubmit = ::submitInput,
+                        onSubmit = ::submitPrompt,
                         onStop = ::stopCurrentRun,
                         onClose = ::dismissAndStop,
                         canOpenConversation = activeRunId == null &&
@@ -295,6 +318,16 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                             } || currentConversationId != null),
                         exitRequested = handoffExitRequested,
                         onOpenConversation = ::openConversation,
+                        onAttachImage = ::attachImage,
+                        onRemoveImage = ::removePendingImage,
+                        onAttachFiles = ::attachFiles,
+                        onAttachFolder = ::attachFolder,
+                        onAttachFilePath = ::attachFilePath,
+                        onRemoveFileReference = ::removePendingFileReference,
+                        onReasoningEffortChange = ::updateReasoningEffort,
+                        onModelSelected = ::selectModel,
+                        onCompactContext = ::compactContext,
+                        onOpenModelProviders = ::openModelProviders,
                     )
                 }
             }
@@ -390,10 +423,31 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
 
     private fun submitPrompt(prompt: String) {
         val normalized = prompt.trim()
-        if (normalized.isBlank() || activeRunId != null) return
+        val pendingImages = uiState.pendingImages
+        val pendingFileReferences = uiState.pendingFileReferences
+        val hasScreenAttachment = screenContextAttachment != null && uiState.screenContext.selected
+        if (
+            (normalized.isBlank() && pendingImages.isEmpty() && pendingFileReferences.isEmpty() && !hasScreenAttachment) ||
+            activeRunId != null
+        ) {
+            return
+        }
+        val fileReferences = pendingFileReferences.map { it.reference }
+        val runtimePrompt = AgentFileReferencePromptCodec.format(normalized, fileReferences)
         val attachment = screenContextAttachment.takeIf { uiState.screenContext.selected }
-        val runImages = attachment?.let { listOf(it.image) }.orEmpty()
-        val previewImages = attachment?.let { listOf(it.previewDataUrl) }.orEmpty()
+        val screenImages = attachment?.let { listOf(it.image) }.orEmpty()
+        val screenPreviewImages = attachment?.let { listOf(it.previewDataUrl) }.orEmpty()
+        val userPendingImages = pendingImages.map {
+            AgentModelClient.ModelImage(
+                reference = it.dataUrl,
+                mimeType = it.mimeType,
+                bytes = it.dataUrl.length,
+                source = it.uri,
+            )
+        }
+        val runImages = screenImages + userPendingImages
+        val previewImages = screenPreviewImages + pendingImages.map { it.dataUrl }
+
         screenContextAttachment = null
         inputText = ""
         if (currentConversationId == null) {
@@ -410,9 +464,11 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             phase = EtaVoicePhase.PROCESSING,
             status = EtaVoiceStatus.Reasoning,
             screenContext = EtaScreenContextStateReducer.consume(),
+            pendingImages = emptyList(),
+            pendingFileReferences = emptyList(),
             messages = uiState.messages + UserMessageUi(
                 id = "user-$runId",
-                content = normalized,
+                content = runtimePrompt,
                 images = previewImages,
             ),
         )
@@ -420,14 +476,14 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         runJob = scope.launch {
             val config = AgentModelClient.loadConfig()
             val payload = AgentExternalArchivePayload(
-                userText = normalized,
+                userText = runtimePrompt,
                 conversationKey = conversationKey,
                 title = normalized.take(40),
             )
             val result = runtimeClient.run(
                 request = AgentRuntimeWire.RunRequest(
                     runId = runId,
-                    prompt = normalized,
+                    prompt = runtimePrompt,
                     config = config,
                     images = runImages,
                     history = conversationHistory,
@@ -448,7 +504,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     conversationHistory = result.contextSnapshot.messages
                 } else if (result.ok) {
                     conversationHistory = conversationHistory +
-                        AgentModelClient.buildUserHistoryMessage(normalized, runImages) + result.transcript
+                        AgentModelClient.buildUserHistoryMessage(runtimePrompt, runImages) + result.transcript
                 }
                 if (result.ok) {
                     uiState = uiState.copy(
@@ -1089,12 +1145,15 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                             isCurrent = meta.id == data.conversationId,
                         )
                     }
+                    inputText = ""
                     uiState = uiState.copy(
                         messages = data.messages,
                         conversationId = data.conversationId,
                         conversationTitle = data.title,
                         historyConversations = items,
                         isHistoryMenuVisible = false,
+                        pendingImages = emptyList(),
+                        pendingFileReferences = emptyList(),
                     )
                 }
             }
@@ -1105,15 +1164,311 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         cancelCurrentRun()
         currentConversationId = null
         conversationHistory = emptyList()
+        inputText = ""
         uiState = uiState.copy(
             messages = emptyList(),
             conversationId = null,
             conversationTitle = "",
             isHistoryMenuVisible = false,
             historyConversations = uiState.historyConversations.map { it.copy(isCurrent = false) },
+            pendingImages = emptyList(),
+            pendingFileReferences = emptyList(),
         )
         showKeyboard()
     }
+
+    private fun observeRuntimeSelection() {
+        scope.launch(Dispatchers.IO) {
+            combine(
+                RuntimeConfigRepository.selectedProviderIdFlow(),
+                RuntimeConfigRepository.selectedModelIdFlow(),
+                ProviderRepository.providersFlow(),
+            ) { providerId, modelId, providers ->
+                Triple(providerId, modelId, providers)
+            }
+                .distinctUntilChanged()
+                .collectLatest { (providerId, modelId, providers) ->
+                    val pickerState = AgentModelPickerProjector.project(
+                        providers = providers,
+                        selectedProviderId = providerId,
+                        selectedModelId = modelId,
+                    )
+                    val capabilities = RuntimeConfigRepository.currentRuntimeConfig()
+                        ?.reasoningCapabilities
+                    withContext(Dispatchers.Main.immediate) {
+                        currentReasoningCapabilities = capabilities
+                        val normalized = capabilities?.normalize(uiState.reasoningEffort) ?: ReasoningEffort.OFF
+                        uiState = uiState.copy(
+                            modelPickerState = pickerState.copy(
+                                isChanging = uiState.modelPickerState.isChanging,
+                            ),
+                            reasoningEffort = normalized,
+                            availableReasoningEfforts = capabilities?.selectableEfforts.orEmpty(),
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun updateReasoningEffort(effort: ReasoningEffort) {
+        val normalized = currentReasoningCapabilities?.normalize(effort) ?: ReasoningEffort.OFF
+        uiState = uiState.copy(
+            reasoningEffort = normalized,
+        )
+    }
+
+    private fun selectModel(modelId: String) {
+        if (activeRunId != null || uiState.modelPickerState.isChanging || uiState.modelPickerState.selectedModel?.id == modelId) {
+            return
+        }
+        uiState = uiState.copy(
+            modelPickerState = uiState.modelPickerState.copy(isChanging = true),
+        )
+        scope.launch(Dispatchers.IO) {
+            try {
+                RuntimeConfigRepository.setSelectedModelId(modelId)
+                RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                withContext(Dispatchers.Main.immediate) {
+                    Toast.makeText(this@EtaAssistantOverlayService, getString(R.string.state_ui_model_switching_failed_please_try_again_later_4af439), Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                withContext(Dispatchers.Main.immediate) {
+                    uiState = uiState.copy(
+                        modelPickerState = uiState.modelPickerState.copy(isChanging = false),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun compactContext() {
+        val conversationId = currentConversationId ?: return
+        if (activeRunId != null || !uiState.canCompactContext || uiState.modelPickerState.isChanging) return
+        val runId = UUID.randomUUID().toString()
+        activeRunId = runId
+        uiState = uiState.copy(
+            isCompacting = true,
+            phase = EtaVoicePhase.PROCESSING,
+            status = EtaVoiceStatus.Reasoning,
+        )
+        updateSoftInput(visible = false)
+        runJob = scope.launch {
+            val config = AgentModelClient.loadConfig()
+            val payload = AgentExternalArchivePayload(
+                userText = "",
+                conversationKey = conversationKey,
+                title = uiState.conversationTitle,
+            )
+            val result = runtimeClient.run(
+                request = AgentRuntimeWire.RunRequest(
+                    runId = runId,
+                    operation = AgentRuntimeWire.OP_COMPACT,
+                    prompt = "",
+                    config = config,
+                    images = emptyList(),
+                    history = conversationHistory,
+                    handoff = AgentRuntimeWire.EntryHandoff(
+                        id = "$conversationKey:$runId",
+                        source = AgentRuntimeWire.ETA_VOICE_HANDOFF_SOURCE,
+                        payload = payload.toJson(),
+                        dismissEntrySurfaceOnForegroundOperation = true,
+                    ),
+                ),
+                onEvent = { event -> handleRuntimeEvent(runId, event) },
+            )
+            withContext(Dispatchers.Main.immediate) {
+                if (activeRunId != runId) return@withContext
+                activeRunId = null
+                runJob = null
+                if (result.contextSnapshot != null) {
+                    conversationHistory = result.contextSnapshot.messages
+                }
+                if (result.ok) {
+                    uiState = uiState.copy(
+                        isCompacting = false,
+                        phase = EtaVoicePhase.READY,
+                        status = EtaVoiceStatus.Completed,
+                        messages = finishRunMessages(runId, result),
+                    )
+                } else {
+                    uiState = uiState.copy(
+                        isCompacting = false,
+                        phase = EtaVoicePhase.ERROR,
+                        status = EtaVoiceStatus.Failed(result.error),
+                        messages = finishRunMessages(runId, result),
+                    )
+                }
+                val saveConvId = currentConversationId ?: conversationId
+                val finalMessages = uiState.messages
+                val finalHistory = conversationHistory
+                scope.launch {
+                    AgentConversationStore.saveAssistantConversation(
+                        context = this@EtaAssistantOverlayService,
+                        conversationId = saveConvId,
+                        title = uiState.conversationTitle,
+                        messages = finalMessages,
+                        history = finalHistory,
+                    )
+                    refreshHistoryConversations(saveConvId)
+                }
+            }
+            runtimeClient.ackResult(runId)
+        }
+    }
+
+    private fun openModelProviders() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        startActivity(intent)
+    }
+
+    private fun attachImage(uri: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val image = AgentImageCodec.fromReference(
+                    context = this@EtaAssistantOverlayService,
+                    value = uri,
+                    source = "user_attach",
+                )
+                if (image == null) {
+                    withContext(Dispatchers.Main.immediate) {
+                        Toast.makeText(
+                            this@EtaAssistantOverlayService,
+                            getString(R.string.state_ui_unable_to_read_this_image_please_try_again_or_us_d94978),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                    return@launch
+                }
+                val preview = AgentImageCodec.previewFromReference(this@EtaAssistantOverlayService, image) ?: image
+                val pending = PendingImageUi(
+                    id = "img-${UUID.randomUUID()}",
+                    uri = image.reference,
+                    dataUrl = preview.reference,
+                    mimeType = image.mimeType,
+                )
+                withContext(Dispatchers.Main.immediate) {
+                    uiState = uiState.copy(pendingImages = uiState.pendingImages + pending)
+                }
+            } finally {
+                val selectedUri = Uri.parse(uri)
+                if (selectedUri.scheme == ContentResolver.SCHEME_CONTENT) {
+                    runCatching {
+                        contentResolver.releasePersistableUriPermission(
+                            selectedUri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun removePendingImage(id: String) {
+        uiState = uiState.copy(pendingImages = uiState.pendingImages.filterNot { it.id == id })
+    }
+
+    private fun attachFiles(uris: List<String>) {
+        if (uris.isEmpty()) return
+        resolveAndAttachFileReferences {
+            val gateway = AgentFileReferenceGateway(this@EtaAssistantOverlayService, AndroidAgentLogger)
+            uris.map { uri ->
+                gateway.resolveDocumentUri(
+                    uri = Uri.parse(uri),
+                    expectedKind = AgentFileReferenceKind.File,
+                )
+            }
+        }
+    }
+
+    private fun attachFolder(uri: String) {
+        resolveAndAttachFileReferences {
+            val gateway = AgentFileReferenceGateway(this@EtaAssistantOverlayService, AndroidAgentLogger)
+            listOf(
+                gateway.resolveDocumentUri(
+                    uri = Uri.parse(uri),
+                    expectedKind = AgentFileReferenceKind.Directory,
+                )
+            )
+        }
+    }
+
+    private fun attachFilePath(path: String) {
+        resolveAndAttachFileReferences {
+            listOf(AgentFileReferenceGateway(AndroidAgentLogger).resolveAbsolutePath(path))
+        }
+    }
+
+    private fun removePendingFileReference(id: String) {
+        uiState = uiState.copy(
+            pendingFileReferences = uiState.pendingFileReferences.filterNot { it.id == id },
+        )
+    }
+
+    private fun resolveAndAttachFileReferences(
+        resolver: () -> List<AgentFileReferenceGateway.Resolution>,
+    ) {
+        scope.launch(Dispatchers.IO) {
+            val resolutions = resolver()
+            val references = resolutions.mapNotNull { resolution ->
+                (resolution as? AgentFileReferenceGateway.Resolution.Success)?.reference
+            }
+            val failures = resolutions.mapNotNull { resolution ->
+                (resolution as? AgentFileReferenceGateway.Resolution.Failure)?.error
+            }
+            withContext(Dispatchers.Main.immediate) {
+                val existingPaths = uiState.pendingFileReferences
+                    .mapTo(mutableSetOf()) { it.reference.absolutePath }
+                val additions = references
+                    .distinctBy { it.absolutePath }
+                    .filter { existingPaths.add(it.absolutePath) }
+                    .map { reference ->
+                        PendingFileReferenceUi(
+                            id = "file-${UUID.randomUUID()}",
+                            reference = reference,
+                        )
+                    }
+                if (additions.isNotEmpty()) {
+                    uiState = uiState.copy(
+                        pendingFileReferences = uiState.pendingFileReferences + additions,
+                    )
+                }
+                val message = when {
+                    failures.size == 1 && references.isEmpty() -> failures.single().userMessage
+                    failures.isNotEmpty() -> resources.getQuantityString(
+                        R.plurals.file_references_added_with_failures,
+                        failures.size,
+                        additions.size,
+                        failures.size,
+                    )
+                    additions.isEmpty() -> getString(R.string.state_ui_the_selected_path_has_been_added_42b432)
+                    else -> null
+                }
+                if (message != null) {
+                    Toast.makeText(this@EtaAssistantOverlayService, message, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private val AgentFileReferenceGateway.Error.userMessage: String
+        get() = when (this) {
+            AgentFileReferenceGateway.Error.UnsupportedDocumentProvider ->
+                getString(R.string.capability_import_denied)
+            AgentFileReferenceGateway.Error.InvalidPath -> getString(R.string.state_ui_please_enter_a_valid_absolute_path_6afeb4)
+            AgentFileReferenceGateway.Error.PathNotFound -> getString(R.string.state_ui_the_path_does_not_exist_or_is_no_longer_accessib_a9776e)
+            AgentFileReferenceGateway.Error.UnsupportedFileType -> getString(R.string.state_ui_only_supports_normal_files_and_folders_4adea0)
+            AgentFileReferenceGateway.Error.TypeMismatch -> getString(R.string.state_ui_the_selected_project_type_does_not_match_3a5c49)
+            AgentFileReferenceGateway.Error.RootUnavailable -> getString(R.string.state_ui_root_is_not_available_and_the_path_cannot_be_ver_fc4c81)
+            AgentFileReferenceGateway.Error.AccessDenied -> getString(R.string.capability_import_denied)
+            AgentFileReferenceGateway.Error.ImportFailed -> getString(R.string.capability_import_failed)
+            AgentFileReferenceGateway.Error.ImportTooLarge -> getString(R.string.capability_import_too_large)
+            AgentFileReferenceGateway.Error.ValidationTimedOut -> getString(R.string.state_ui_path_verification_timed_out_please_try_again_703687)
+        }
 
     internal companion object {
         const val ACTION_SHOW = "io.github.mangi.eta.agent.voice.SHOW"

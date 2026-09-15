@@ -79,6 +79,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -97,25 +98,29 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.mangi.eta.R
+import io.github.mangi.eta.agent.media.AgentImageCodec
+import io.github.mangi.eta.data.model.ReasoningEffort
+import io.github.mangi.eta.ui.components.AgentChatInputBar
 import io.github.mangi.eta.ui.components.AgentConversationMessages
-import io.github.mangi.eta.ui.components.rememberDataUrlBitmap
+import io.github.mangi.eta.ui.components.folmeSpring
 import io.github.mangi.eta.ui.model.AgentChatMessageUi
+import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.AgentMessageUi
+import io.github.mangi.eta.ui.model.AgentModelPickerUiState
+import io.github.mangi.eta.ui.model.PendingFileReferenceUi
+import io.github.mangi.eta.ui.model.PendingImageUi
 import io.github.mangi.eta.ui.model.ThinkingMessageUi
 import io.github.mangi.eta.ui.model.ToolActivityMessageUi
 import io.github.mangi.eta.ui.model.UserMessageUi
+import io.github.mangi.eta.ui.model.latestContextUsage
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.anim.folmeSpring
-import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.squircle.squircleBackground
-import top.yukonga.miuix.kmp.squircle.squircleClip
-import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal enum class EtaVoicePhase {
@@ -140,7 +145,21 @@ internal data class EtaVoiceUiState(
     val conversationTitle: String = "",
     val historyConversations: List<AssistantConversationItem> = emptyList(),
     val isHistoryMenuVisible: Boolean = false,
-)
+    val modelPickerState: AgentModelPickerUiState = AgentModelPickerUiState(),
+    val reasoningEffort: ReasoningEffort = ReasoningEffort.OFF,
+    val availableReasoningEfforts: List<ReasoningEffort> = emptyList(),
+    val pendingImages: List<PendingImageUi> = emptyList(),
+    val pendingFileReferences: List<PendingFileReferenceUi> = emptyList(),
+    val isCompacting: Boolean = false,
+) {
+    val contextUsage: AgentContextUsageUi
+        get() = latestContextUsage(messages, modelPickerState.selectedModel)
+
+    val canCompactContext: Boolean
+        get() = phase != EtaVoicePhase.PROCESSING && !isCompacting && messages.any { message ->
+            message is AgentMessageUi && message.content.isNotBlank()
+        }
+}
 
 internal sealed interface EtaVoiceStatus {
     data object InputRequest : EtaVoiceStatus
@@ -239,10 +258,20 @@ internal fun EtaVoicePanel(
     onToggleHistoryMenu: () -> Unit,
     onSelectConversation: (String) -> Unit,
     onNewConversation: () -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (String) -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
     onOpenConversation: () -> Unit,
+    onAttachImage: (String) -> Unit,
+    onRemoveImage: (String) -> Unit,
+    onAttachFiles: (List<String>) -> Unit,
+    onAttachFolder: (String) -> Unit,
+    onAttachFilePath: (String) -> Unit,
+    onRemoveFileReference: (String) -> Unit,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
+    onCompactContext: () -> Unit,
+    onOpenModelProviders: () -> Unit = {},
 ) {
     val colors = rememberEtaVoicePanelColors()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -322,13 +351,23 @@ internal fun EtaVoicePanel(
                 onToggleHistoryMenu = onToggleHistoryMenu,
                 onSelectConversation = onSelectConversation,
                 onNewConversation = onNewConversation,
-                onSubmit = {
+                onSubmit = { text ->
                     keyboard?.hide()
-                    onSubmit()
+                    onSubmit(text)
                 },
                 onStop = onStop,
                 onClose = onClose,
                 onOpenConversation = onOpenConversation,
+                onAttachImage = onAttachImage,
+                onRemoveImage = onRemoveImage,
+                onAttachFiles = onAttachFiles,
+                onAttachFolder = onAttachFolder,
+                onAttachFilePath = onAttachFilePath,
+                onRemoveFileReference = onRemoveFileReference,
+                onReasoningEffortChange = onReasoningEffortChange,
+                onModelSelected = onModelSelected,
+                onCompactContext = onCompactContext,
+                onOpenModelProviders = onOpenModelProviders,
             )
         }
     }
@@ -352,10 +391,20 @@ private fun BoxScope.AssistantPanel(
     onToggleHistoryMenu: () -> Unit,
     onSelectConversation: (String) -> Unit,
     onNewConversation: () -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (String) -> Unit,
     onStop: () -> Unit,
     onClose: () -> Unit,
     onOpenConversation: () -> Unit,
+    onAttachImage: (String) -> Unit,
+    onRemoveImage: (String) -> Unit,
+    onAttachFiles: (List<String>) -> Unit,
+    onAttachFolder: (String) -> Unit,
+    onAttachFilePath: (String) -> Unit,
+    onRemoveFileReference: (String) -> Unit,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
+    onCompactContext: () -> Unit,
+    onOpenModelProviders: () -> Unit,
 ) {
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
@@ -641,6 +690,16 @@ private fun BoxScope.AssistantPanel(
             onNewConversation = onNewConversation,
             onSubmit = onSubmit,
             onStop = onStop,
+            onAttachImage = onAttachImage,
+            onRemoveImage = onRemoveImage,
+            onAttachFiles = onAttachFiles,
+            onAttachFolder = onAttachFolder,
+            onAttachFilePath = onAttachFilePath,
+            onRemoveFileReference = onRemoveFileReference,
+            onReasoningEffortChange = onReasoningEffortChange,
+            onModelSelected = onModelSelected,
+            onCompactContext = onCompactContext,
+            onOpenModelProviders = onOpenModelProviders,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
@@ -665,8 +724,18 @@ private fun AssistantComposer(
     onScreenTranslation: () -> Unit,
     onToggleHistoryMenu: () -> Unit,
     onNewConversation: () -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (String) -> Unit,
     onStop: () -> Unit,
+    onAttachImage: (String) -> Unit,
+    onRemoveImage: (String) -> Unit,
+    onAttachFiles: (List<String>) -> Unit,
+    onAttachFolder: (String) -> Unit,
+    onAttachFilePath: (String) -> Unit,
+    onRemoveFileReference: (String) -> Unit,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onModelSelected: (String) -> Unit,
+    onCompactContext: () -> Unit,
+    onOpenModelProviders: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -707,14 +776,35 @@ private fun AssistantComposer(
             )
         }
         Spacer(Modifier.height(7.dp))
-        AssistantInputBar(
-            state = state,
+        AgentChatInputBar(
             input = input,
-            colors = colors,
-            focusRequester = focusRequester,
-            onInputChange = onInputChange,
+            modelPickerState = state.modelPickerState,
+            isCompacting = state.isCompacting,
+            contextUsage = state.contextUsage,
+            showContextUsage = state.contextUsage.contextTokens != null,
+            isStreaming = state.phase == EtaVoicePhase.PROCESSING,
+            reasoningEffort = state.reasoningEffort,
+            availableReasoningEfforts = state.availableReasoningEfforts,
+            pendingImages = state.pendingImages,
+            pendingFileReferences = state.pendingFileReferences,
+            isEditingMessage = false,
+            editHasLaterTurns = false,
+            preserveFollowingMessages = false,
+            onReasoningEffortChange = onReasoningEffortChange,
+            onCompactContext = onCompactContext,
+            canCompactContext = state.canCompactContext && state.phase != EtaVoicePhase.PROCESSING,
+            onModelSelected = onModelSelected,
             onSubmit = onSubmit,
             onStop = onStop,
+            onAttachImage = onAttachImage,
+            onRemoveImage = onRemoveImage,
+            onAttachFiles = onAttachFiles,
+            onAttachFolder = onAttachFolder,
+            onAttachFilePath = onAttachFilePath,
+            onRemoveFileReference = onRemoveFileReference,
+            onCancelMessageEdit = {},
+            onOpenModelProviders = onOpenModelProviders,
+            focusRequester = focusRequester,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -873,102 +963,6 @@ private fun DragHandle(colors: EtaVoicePanelColors, modifier: Modifier = Modifie
                 .clip(CircleShape)
                 .background(colors.tertiary),
         )
-    }
-}
-
-@Composable
-private fun AssistantInputBar(
-    state: EtaVoiceUiState,
-    input: String,
-    colors: EtaVoicePanelColors,
-    focusRequester: FocusRequester,
-    onInputChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onStop: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val canSubmit = input.isNotBlank() && state.phase != EtaVoicePhase.PROCESSING
-    Row(
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .squircleBackground(colors.input, 24.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {},
-            )
-            .padding(start = 16.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BasicTextField(
-            value = input,
-            onValueChange = onInputChange,
-            modifier = Modifier
-                .weight(1f)
-                .padding(vertical = 6.dp)
-                .focusRequester(focusRequester),
-            enabled = state.phase != EtaVoicePhase.PROCESSING,
-            textStyle = TextStyle(
-                color = colors.inputPrimary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-            ),
-            cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { if (canSubmit) onSubmit() }),
-            maxLines = 4,
-            minLines = 1,
-            decorationBox = { innerTextField ->
-                Box(contentAlignment = Alignment.CenterStart) {
-                    if (input.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.voice_input_hint),
-                            color = colors.inputTertiary,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
-        if (state.phase == EtaVoicePhase.PROCESSING) {
-            IconButton(
-                onClick = onStop,
-                minWidth = 36.dp,
-                minHeight = 36.dp,
-                cornerRadius = 18.dp,
-                backgroundColor = MiuixTheme.colorScheme.error,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Stop,
-                    contentDescription = stringResource(R.string.action_stop),
-                    modifier = Modifier.size(15.dp),
-                    tint = Color.White,
-                )
-            }
-        } else {
-            IconButton(
-                onClick = onSubmit,
-                enabled = canSubmit,
-                minWidth = 36.dp,
-                minHeight = 36.dp,
-                cornerRadius = 18.dp,
-                backgroundColor = if (canSubmit) {
-                    MiuixTheme.colorScheme.primary
-                } else {
-                    colors.inputTertiary.copy(alpha = 0.35f)
-                },
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = stringResource(R.string.voice_send),
-                    modifier = Modifier.size(17.dp),
-                    tint = if (canSubmit) Color.White else colors.inputSecondary,
-                )
-            }
-        }
     }
 }
 

@@ -127,10 +127,10 @@ internal fun AgentChatInputBar(
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    focusRequester: FocusRequester = remember { FocusRequester() },
     modifier: Modifier = Modifier,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
-    val focusRequester = remember { FocusRequester() }
     val textFieldState = rememberTextFieldState(initialText = input)
     var wasEditingMessage by remember { mutableStateOf(isEditingMessage) }
     val canSend = textFieldState.text.isNotBlank() ||

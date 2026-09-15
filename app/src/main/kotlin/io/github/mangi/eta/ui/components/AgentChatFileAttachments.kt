@@ -80,29 +80,55 @@ internal fun AgentAttachmentPickerButton(
     var showPopup by remember { mutableStateOf(false) }
     var showPathDialog by remember { mutableStateOf(false) }
     var pathInput by remember { mutableStateOf("") }
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(),
-    ) { uris ->
-        uris.forEach { uri ->
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
+    val registryOwner = androidx.activity.compose.LocalActivityResultRegistryOwner.current
+
+    val photoPicker = if (registryOwner != null) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickMultipleVisualMedia(),
+        ) { uris ->
+            uris.forEach { uri ->
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                onAttachImage(uri.toString())
             }
-            onAttachImage(uri.toString())
         }
-    }
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        if (uris.isNotEmpty()) onAttachFiles(uris.map { it.toString() })
-    }
-    val folderPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
-        if (uri != null) onAttachFolder(uri.toString())
-    }
+    } else null
+
+    val filePicker = if (registryOwner != null) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenMultipleDocuments(),
+        ) { uris ->
+            uris.forEach { uri ->
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+            }
+            if (uris.isNotEmpty()) onAttachFiles(uris.map { it.toString() })
+        }
+    } else null
+
+    val folderPicker = if (registryOwner != null) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree(),
+        ) { uri ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                onAttachFolder(uri.toString())
+            }
+        }
+    } else null
 
     Box(modifier = modifier) {
         IconButton(
@@ -143,11 +169,35 @@ internal fun AgentAttachmentPickerButton(
                         onSelectedIndexChange = {
                             dismiss?.invoke()
                             when (index) {
-                                0 -> photoPicker.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                                1 -> filePicker.launch(arrayOf("*/*"))
-                                2 -> folderPicker.launch(null)
+                                0 -> {
+                                    if (photoPicker != null) {
+                                        photoPicker.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    } else {
+                                        AgentAttachmentPickerTrampolineActivity.pickImages(context) { uris ->
+                                            uris.forEach { onAttachImage(it) }
+                                        }
+                                    }
+                                }
+                                1 -> {
+                                    if (filePicker != null) {
+                                        filePicker.launch(arrayOf("*/*"))
+                                    } else {
+                                        AgentAttachmentPickerTrampolineActivity.pickFiles(context) { uris ->
+                                            onAttachFiles(uris)
+                                        }
+                                    }
+                                }
+                                2 -> {
+                                    if (folderPicker != null) {
+                                        folderPicker.launch(null)
+                                    } else {
+                                        AgentAttachmentPickerTrampolineActivity.pickFolder(context) { uri ->
+                                            onAttachFolder(uri)
+                                        }
+                                    }
+                                }
                                 3 -> {
                                     pathInput = ""
                                     showPathDialog = true
