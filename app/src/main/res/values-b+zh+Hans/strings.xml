@@ -1182,4 +1182,18 @@
   <string name="data_backup_imported">已导入 %1$d 个对话和 %2$d 个模型提供商</string>
   <string name="data_backup_failed">备份操作失败</string>
   <string name="data_backup_file_open_failed">无法打开所选文件</string>
+  <string name="functional_models_title">功能模型</string>
+  <string name="functional_model_chat">默认主对话</string>
+  <string name="functional_model_translation">屏幕翻译</string>
+  <string name="functional_model_follow_default">跟随默认对话模型</string>
+  <string name="set_as_translation_model">设为屏幕翻译模型</string>
+  <string name="clear_translation_model">恢复跟随默认</string>
+  <string name="tag_translation_model">屏幕翻译</string>
+  <string name="tag_default_chat_model">默认对话</string>
+  <string name="select_translation_model_dialog_title">选择屏幕翻译模型</string>
+<
+  <string name="functional_model_set_as_chat">设为默认主对话模型</string>
+  <string name="functional_model_set_as_translation">设为屏幕翻译模型</string>
+  <string name="functional_model_current_chat">当前主对话模型</string>
+  <string name="functional_model_current_translation">当前屏幕翻译模型</string>
 </resources>

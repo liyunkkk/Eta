@@ -86,7 +86,6 @@ internal fun ModelProviderDetailScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val providers by ProviderRepository.providersFlow().collectAsState(initial = emptyList())
-    val selectedTranslationProviderId by RuntimeConfigRepository.selectedTranslationProviderIdFlow().collectAsState(initial = null)
     var createdId by remember { mutableStateOf<String?>(null) }
     val effectiveId = providerId ?: createdId
     val provider = remember(providers, effectiveId) {
@@ -170,7 +169,6 @@ internal fun ModelProviderDetailScreen(
                         onDraftChange = { configDraft = it },
                         scope = scope,
                         isNew = isNew,
-                        selectedTranslationProviderId = selectedTranslationProviderId,
                         scrollBehavior = scrollBehavior,
                         contentSidePadding = sidePadding,
                         onCreated = { id -> createdId = id },
@@ -197,7 +195,6 @@ private fun ProviderConfigTab(
     onDraftChange: (ProviderConfigDraft) -> Unit,
     scope: CoroutineScope,
     isNew: Boolean,
-    selectedTranslationProviderId: String?,
     scrollBehavior: ScrollBehavior,
     contentSidePadding: Dp,
     onCreated: (String) -> Unit,
@@ -476,59 +473,6 @@ private fun ProviderConfigTab(
             }
         }
 
-        if (!isNew && provider != null) {
-            val isTranslationProvider = selectedTranslationProviderId == provider.id
-            item(key = "translation_api_action") {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 12.dp),
-                    showIndication = true,
-                    onClick = if (isWorking) {
-                        null
-                    } else {
-                        {
-                            scope.launch {
-                                isWorking = true
-                                try {
-                                    if (isTranslationProvider) {
-                                        RuntimeConfigRepository.setSelectedTranslationProviderId(null)
-                                        status = context.getString(R.string.screen_translation_cleared_translation_api)
-                                    } else {
-                                        RuntimeConfigRepository.setSelectedTranslationProviderId(provider.id)
-                                        status = context.getString(
-                                            R.string.screen_translation_applied_translation_api,
-                                            provider.name,
-                                        )
-                                    }
-                                } finally {
-                                    isWorking = false
-                                }
-                            }
-                        }
-                    },
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 14.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = if (isTranslationProvider) {
-                                stringResource(R.string.screen_translation_current_translation_api)
-                            } else {
-                                stringResource(R.string.screen_translation_set_as_translation_api)
-                            },
-                            fontSize = MiuixTheme.textStyles.headline1.fontSize,
-                            fontWeight = FontWeight.Medium,
-                            color = if (isTranslationProvider) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            }
-        }
         if (!isNew) {
             item(key = "danger_zone") {
                 Card(

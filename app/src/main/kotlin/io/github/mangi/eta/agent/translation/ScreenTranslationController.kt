@@ -427,13 +427,26 @@ internal object ScreenTranslationController {
             }
         }.getOrNull()
         if (repoConfig != null && repoConfig.apiKey.isNotBlank()) {
-            return repoConfig
+            return repoConfig.copy(
+                thinkingEnabled = false,
+                reasoningEffort = io.github.mangi.eta.data.model.ReasoningEffort.OFF,
+                reasoningCapabilities = null,
+            )
         }
         val clientConfig = runCatching { AgentModelClient.loadConfig() }.getOrNull()
         if (clientConfig != null && clientConfig.apiKey.isNotBlank()) {
-            return clientConfig
+            return clientConfig.copy(
+                thinkingEnabled = false,
+                reasoningEffort = io.github.mangi.eta.data.model.ReasoningEffort.OFF,
+                reasoningCapabilities = null,
+            )
         }
-        return repoConfig ?: clientConfig
+        val fallback = repoConfig ?: clientConfig
+        return fallback?.copy(
+            thinkingEnabled = false,
+            reasoningEffort = io.github.mangi.eta.data.model.ReasoningEffort.OFF,
+            reasoningCapabilities = null,
+        )
     }
 
     private fun runTranslationBatch(
@@ -487,6 +500,9 @@ internal object ScreenTranslationController {
                 hostedWebSearchEnabled = false,
                 extraBodyJson = "",
                 customBody = emptyList(),
+                thinkingEnabled = false,
+                reasoningEffort = io.github.mangi.eta.data.model.ReasoningEffort.OFF,
+                reasoningCapabilities = null,
             ),
             messages = messages,
             tools = JSONArray(),
@@ -541,66 +557,113 @@ internal object ScreenTranslationController {
     }
 
     private fun parseTranslations(content: String): List<Pair<Int, String>>? {
-        val trimmed = content.trim()
-        val jsonText = strippedOfCodeFence(trimmed)
-        if (jsonText.startsWith("[")) {
-            runCatching { JSONArray(jsonText) }.getOrNull()?.let { array ->
-                val out = ArrayList<Pair<Int, String>>(array.length())
-                for (i in 0 until array.length()) {
-                    val item = array.optJSONObject(i)
-                    if (item != null) {
-                        val id = item.optInt("id", -1)
-                        val text = item.optString("text", "")
-                        if (id >= 0) out.add(id to text)
-                    } else {
-                        val raw = array.optString(i, "")
-                        val obj = runCatching { JSONObject(raw) }.getOrNull()
-                        if (obj != null) {
-                            val id = obj.optInt("id", -1)
-                            val text = obj.optString("text", "")
-                            if (id >= 0) out.add(id to text)
-                        }
-                    }
-                }
+        val cleaned = cleanResponseContent(content)
+
+        // 1. 尝试直接从整体 JSON Array 解析
+        val arrayMatch = Regex("""\[\s*\{[\s\S]*\}\s*\]""").find(cleaned)
+        if (arrayMatch != null) {
+            runCatching { JSONArray(arrayMatch.value) }.getOrNull()?.let { array ->
+                val out = extractFromArray(array)
                 if (out.isNotEmpty()) return out
             }
-        } else if (jsonText.startsWith("{")) {
-            runCatching { JSONObject(jsonText) }.getOrNull()?.let { obj ->
-                val items = obj.optJSONArray("items")
+        }
+
+        // 2. 尝试从 JSON Object { "items": [...] } 解析
+        val objectMatch = Regex("""\{\s*"(?:items|translations|data)"\s*:\s*\[[\s\S]*\]\s*\}""").find(cleaned)
+        if (objectMatch != null) {
+            runCatching { JSONObject(objectMatch.value) }.getOrNull()?.let { obj ->
+                val items = obj.optJSONArray("items") ?: obj.optJSONArray("translations") ?: obj.optJSONArray("data")
                 if (items != null) {
-                    val out = ArrayList<Pair<Int, String>>(items.length())
-                    for (i in 0 until items.length()) {
-                        val item = items.optJSONObject(i) ?: continue
-                        val id = item.optInt("id", -1)
-                        val text = item.optString("text", "")
-                        if (id >= 0) out.add(id to text)
-                    }
+                    val out = extractFromArray(items)
                     if (out.isNotEmpty()) return out
                 }
             }
         }
-        val lines = trimmed.lines().map { it.trim() }.filter { it.isNotEmpty() }
+
+        // 3. 正则扫描独立的 {"id": ..., "text": "..."} 块（容错即使外层包裹坏掉或截断）
+        val itemPattern = Regex("""\{\s*"id"\s*:\s*(\d+)\s*,\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}""")
+        val matches = itemPattern.findAll(cleaned).toList()
+        if (matches.isNotEmpty()) {
+            val out = ArrayList<Pair<Int, String>>(matches.size)
+            for (m in matches) {
+                val id = m.groupValues[1].toIntOrNull() ?: continue
+                val text = unescapeJsonString(m.groupValues[2])
+                out.add(id to text)
+            }
+            if (out.isNotEmpty()) return out
+        }
+
+        // 4. 正则反序扫描 {"text": "...", "id": ...}
+        val reversedItemPattern = Regex("""\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"id"\s*:\s*(\d+)\s*\}""")
+        val reversedMatches = reversedItemPattern.findAll(cleaned).toList()
+        if (reversedMatches.isNotEmpty()) {
+            val out = ArrayList<Pair<Int, String>>(reversedMatches.size)
+            for (m in reversedMatches) {
+                val text = unescapeJsonString(m.groupValues[1])
+                val id = m.groupValues[2].toIntOrNull() ?: continue
+                out.add(id to text)
+            }
+            if (out.isNotEmpty()) return out
+        }
+
+        // 5. 按行解析多格式兜底: "0|译文", "0: 译文", "0. 译文", "[0] 译文"
+        val linePattern = Regex("""^\s*(?:\[|\()?(\d+)(?:\]|\))?\s*[:|\-\.]\s*(.+)$""")
+        val lines = cleaned.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val out = ArrayList<Pair<Int, String>>(lines.size)
         for (line in lines) {
-            val sep = line.indexOf('|')
-            if (sep > 0) {
-                val id = runCatching { line.substring(0, sep).trim().toInt() }.getOrNull()
-                if (id != null && id >= 0) {
-                    out.add(id to line.substring(sep + 1).trim())
+            val match = linePattern.matchEntire(line)
+            if (match != null) {
+                val id = match.groupValues[1].toIntOrNull()
+                val text = match.groupValues[2].trim().removeSurrounding(""")
+                if (id != null && id >= 0 && text.isNotBlank()) {
+                    out.add(id to text)
                 }
             }
         }
         return if (out.isNotEmpty()) out else null
     }
 
-    private fun strippedOfCodeFence(text: String): String {
-        var t = text.trim()
-        if (t.startsWith("```")) {
-            t = t.removePrefix("```json").removePrefix("```JSON")
-                .removePrefix("```").trim()
+    private fun extractFromArray(array: JSONArray): List<Pair<Int, String>> {
+        val out = ArrayList<Pair<Int, String>>(array.length())
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i)
+            if (item != null) {
+                val id = item.optInt("id", -1)
+                val text = item.optString("text", "")
+                if (id >= 0 && text.isNotBlank()) out.add(id to text)
+            } else {
+                val raw = array.optString(i, "")
+                val obj = runCatching { JSONObject(raw) }.getOrNull()
+                if (obj != null) {
+                    val id = obj.optInt("id", -1)
+                    val text = obj.optString("text", "")
+                    if (id >= 0 && text.isNotBlank()) out.add(id to text)
+                }
+            }
         }
-        if (t.endsWith("```")) t = t.removeSuffix("```").trim()
-        return t
+        return out
+    }
+
+    private fun cleanResponseContent(content: String): String {
+        var text = content.trim()
+        text = text.replace(Regex("""<think>[\s\S]*?</think>"""), "")
+        text = text.replace(Regex("""<thought>[\s\S]*?</thought>"""), "")
+        if (text.contains("```")) {
+            val codeBlockMatch = Regex("""```(?:json|JSON)?\s*([\s\S]*?)\s*```""").find(text)
+            if (codeBlockMatch != null) {
+                return codeBlockMatch.groupValues[1].trim()
+            }
+        }
+        return text.trim()
+    }
+
+    private fun unescapeJsonString(str: String): String {
+        return str.replace("\"", """)
+            .replace("\n", "
+")
+            .replace("\r", "")
+            .replace("\t", "	")
+            .replace("\\\\", "\\")
     }
 
     private fun systemPrompt(context: Context): JSONObject {

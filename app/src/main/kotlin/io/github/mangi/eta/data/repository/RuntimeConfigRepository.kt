@@ -109,16 +109,22 @@ internal object RuntimeConfigRepository {
         ProviderRepository.ensureBuiltInsMerged()
         val settings = SettingsDataStore.settings()
         val translationProviderId = settings.selectedTranslationProviderId
-        if (translationProviderId != null) {
+        val baseConfig = if (translationProviderId != null) {
             val provider = ProviderRepository.providerById(translationProviderId)?.takeIf { it.isEnabled }
             if (provider != null) {
                 val model = provider.selectedOrFirstModel(settings.selectedTranslationModelId)
                 if (model != null) {
-                    return buildRuntimeConfig(provider, model)
-                }
-            }
-        }
-        return currentRuntimeConfig()
+                    buildRuntimeConfig(provider, model)
+                } else null
+            } else null
+        } else null
+
+        val config = baseConfig ?: currentRuntimeConfig() ?: return null
+        return config.copy(
+            thinkingEnabled = false,
+            reasoningEffort = ReasoningEffort.OFF,
+            reasoningCapabilities = null,
+        )
     }
 
     suspend fun syncToRemotePreferences(service: XposedService?): Boolean {

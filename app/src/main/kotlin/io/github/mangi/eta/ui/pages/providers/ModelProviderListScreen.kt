@@ -220,7 +220,7 @@ private fun ProviderListItem(
                     provider.typeLabel,
                     pluralStringResource(R.plurals.provider_models_count, provider.models.size, provider.models.size),
                     stringResource(R.string.ui_built_in_09ceea).takeIf { provider.isBuiltIn },
-                    stringResource(R.string.screen_translation_translation_api_badge).takeIf { isTranslationSelected },
+                    stringResource(R.string.functional_model_translation).takeIf { isTranslationSelected },
                 ).joinToString(" · "),
                 style = MiuixTheme.textStyles.footnote1,
                 color = if (isTranslationSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,

@@ -88,6 +88,11 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.MoreHoriz
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.CheckboxLocation
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
@@ -184,7 +189,10 @@ internal fun ProviderModelsTab(
     contentSidePadding: Dp,
 ) {
     val context = LocalContext.current
+    val selectedProviderId by RuntimeConfigRepository.selectedProviderIdFlow().collectAsState(initial = null)
     val selectedModelId by RuntimeConfigRepository.selectedModelIdFlow().collectAsState(initial = null)
+    val selectedTranslationProviderId by RuntimeConfigRepository.selectedTranslationProviderIdFlow().collectAsState(initial = null)
+    val selectedTranslationModelId by RuntimeConfigRepository.selectedTranslationModelIdFlow().collectAsState(initial = null)
     var isFetching by remember { mutableStateOf(false) }
     var isMutatingModel by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -374,10 +382,13 @@ internal fun ProviderModelsTab(
                         isFirst = index == 0,
                         isLast = index == filteredModels.lastIndex,
                     ) {
+                        val isDefault = (provider.id == selectedProviderId && model.id == selectedModelId)
+                        val isTranslation = (provider.id == selectedTranslationProviderId && model.id == selectedTranslationModelId)
                         ModelListItem(
                             model = model,
                             enabled = !isFetching && !isMutatingModel,
-                            isSelected = model.id == selectedModelId,
+                            isDefaultSelected = isDefault,
+                            isTranslationSelected = isTranslation,
                             selectionMode = selectionMode,
                             checked = model.id in selectedModelIds,
                             onToggleChecked = {
@@ -396,10 +407,20 @@ internal fun ProviderModelsTab(
                                 isCreatingModel = false
                                 editingModel = model
                             },
-                            onSetCurrent = {
+                            onSetDefault = {
                                 scope.launch {
                                     RuntimeConfigRepository.setSelectedModelId(model.id)
                                     RuntimeConfigRepository.syncToRemotePreferences(EtaApp.serviceInstance)
+                                }
+                            },
+                            onSetTranslation = {
+                                scope.launch {
+                                    if (isTranslation) {
+                                        RuntimeConfigRepository.setSelectedTranslationModelId(null)
+                                        RuntimeConfigRepository.setSelectedTranslationProviderId(null)
+                                    } else {
+                                        RuntimeConfigRepository.setSelectedTranslationModelId(model.id)
+                                    }
                                 }
                             },
                         )
@@ -668,13 +689,15 @@ private fun ModelSelectionBar(
 private fun ModelListItem(
     model: Model,
     enabled: Boolean,
-    isSelected: Boolean,
+    isDefaultSelected: Boolean,
+    isTranslationSelected: Boolean,
     selectionMode: Boolean,
     checked: Boolean,
     onToggleChecked: () -> Unit,
     onEnterSelection: () -> Unit,
     onEdit: () -> Unit,
-    onSetCurrent: () -> Unit,
+    onSetDefault: () -> Unit,
+    onSetTranslation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -683,7 +706,7 @@ private fun ModelListItem(
             .fillMaxWidth()
             .combinedClickable(
                 enabled = enabled,
-                onClick = if (selectionMode) onToggleChecked else onSetCurrent,
+                onClick = if (selectionMode) onToggleChecked else onSetDefault,
                 onLongClick = {
                     if (selectionMode) onToggleChecked() else onEnterSelection()
                 },
@@ -713,8 +736,17 @@ private fun ModelListItem(
                 capabilityTags(model).forEach { tag ->
                     TagChip(text = tag)
                 }
-                if (isSelected) {
-                    TagChip(text = stringResource(R.string.ui_current_25e74d), tone = TagChipTone.Emphasized)
+                if (isDefaultSelected) {
+                    TagChip(
+                        text = stringResource(R.string.functional_model_chat),
+                        tone = TagChipTone.Emphasized,
+                    )
+                }
+                if (isTranslationSelected) {
+                    TagChip(
+                        text = stringResource(R.string.functional_model_translation),
+                        tone = TagChipTone.Emphasized,
+                    )
                 }
             }
         }
@@ -725,20 +757,56 @@ private fun ModelListItem(
                 enabled = enabled,
             )
         } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onEdit, enabled = enabled) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                OverlayIconDropdownMenu(
+                    entry = DropdownEntry(
+                        items = listOfNotNull(
+                            DropdownItem(
+                                text = if (isDefaultSelected) {
+                                    stringResource(R.string.functional_model_current_chat)
+                                } else {
+                                    stringResource(R.string.functional_model_set_as_chat)
+                                },
+                                enabled = enabled && !isDefaultSelected,
+                                onClick = onSetDefault,
+                            ),
+                            DropdownItem(
+                                text = if (isTranslationSelected) {
+                                    stringResource(R.string.screen_translation_cleared_translation_api)
+                                } else {
+                                    stringResource(R.string.functional_model_set_as_translation)
+                                },
+                                enabled = enabled,
+                                onClick = onSetTranslation,
+                            ),
+                            DropdownItem(
+                                text = stringResource(R.string.ui_edit_model_parameters_ba4864),
+                                enabled = enabled,
+                                onClick = onEdit,
+                            ),
+                        ),
+                    ),
+                ) {
                     Icon(
-                        imageVector = Icons.Rounded.Tune,
-                        contentDescription = stringResource(R.string.ui_edit_model_parameters_ba4864),
+                        imageVector = Icons.Rounded.MoreHoriz,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
                     )
                 }
-                IconButton(onClick = onSetCurrent, enabled = enabled) {
+                IconButton(onClick = onSetDefault, enabled = enabled) {
                     Icon(
-                        imageVector = if (isSelected) Icons.Rounded.Check
+                        imageVector = if (isDefaultSelected) Icons.Rounded.Check
                             else Icons.Rounded.RadioButtonUnchecked,
-                        contentDescription = if (isSelected) context.getString(R.string.page_current_model_a0af8f) else context.getString(R.string.page_set_as_current_model_183d7d),
-                        tint = if (isSelected) {
+                        contentDescription = if (isDefaultSelected) {
+                            stringResource(R.string.functional_model_current_chat)
+                        } else {
+                            stringResource(R.string.functional_model_set_as_chat)
+                        },
+                        tint = if (isDefaultSelected) {
                             MiuixTheme.colorScheme.primary
                         } else {
                             MiuixTheme.colorScheme.onSurfaceVariantActions
