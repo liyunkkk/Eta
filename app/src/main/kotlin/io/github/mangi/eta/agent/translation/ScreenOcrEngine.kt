@@ -7,20 +7,15 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
-import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.math.abs
 
 /**
  * 屏幕像素级 OCR 引擎：基于 Google ML Kit 离线端侧高精度识别。
  * 遍历全屏文本行，提取高精度 Bounding Box 像素坐标与采样背景色。
  */
 internal object ScreenOcrEngine {
-
     private val recognizer: TextRecognizer by lazy {
         TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
     }
@@ -44,7 +39,9 @@ internal object ScreenOcrEngine {
         for (block in visionText.textBlocks) {
             for (line in block.lines) {
                 val text = line.text.trim()
-                if (text.length < 2 || isNoise(text)) continue
+                // 放宽过滤限制：只要包含有效文字或字母数字字符，即使是单字符（如 "OK", "+", "A"）也完整保留
+                if (text.isEmpty() || isPurePunctuation(text)) continue
+
                 val box = line.boundingBox ?: continue
                 if (box.width() <= 0 || box.height() <= 0) continue
 
@@ -55,10 +52,11 @@ internal object ScreenOcrEngine {
                     box.right.coerceIn(1, width),
                     box.bottom.coerceIn(1, height),
                 )
-                if (safeRect.width() <= 4 || safeRect.height() <= 4) continue
+                if (safeRect.width() <= 3 || safeRect.height() <= 3) continue
 
-                // 智能采样背景色
+                // 智能精确采样背景底色
                 val sampledColor = sampleBackgroundColor(bitmap, safeRect, width, height)
+
                 results.add(
                     ScreenTranslationBlock(
                         source = text,
@@ -68,15 +66,22 @@ internal object ScreenOcrEngine {
                 )
             }
         }
+
         return results
     }
 
-    private fun isNoise(text: String): Boolean {
-        var letterOrDigit = 0
+    /**
+     * 判断是否是纯标点符号杂讯（如单独的逗号、句号、横杠等）
+     */
+    private fun isPurePunctuation(text: String): Boolean {
+        var hasValidChar = false
         for (ch in text) {
-            if (ch.isLetterOrDigit()) letterOrDigit++
+            if (ch.isLetterOrDigit() || ch.code in 0x4E00..0x9FA5 || ch.code in 0x3040..0x30FF || ch.code in 0xAC00..0xD7AF) {
+                hasValidChar = true
+                break
+            }
         }
-        return letterOrDigit == 0
+        return !hasValidChar
     }
 
     /**
@@ -92,30 +97,31 @@ internal object ScreenOcrEngine {
             Pair(rect.right + 3, rect.centerY()),
             Pair(rect.centerX(), rect.top - 3),
             Pair(rect.centerX(), rect.bottom + 3),
+            Pair((rect.left + rect.centerX()) / 2, rect.top - 2),
+            Pair((rect.left + rect.centerX()) / 2, rect.bottom + 2),
+            Pair((rect.right + rect.centerX()) / 2, rect.top - 2),
+            Pair((rect.right + rect.centerX()) / 2, rect.bottom + 2),
         )
+
         val validColors = ArrayList<Int>()
         for ((x, y) in samplePoints) {
             if (x in 0 until width && y in 0 until height) {
                 val pixel = bitmap.getPixel(x, y)
-                // 忽略完全透明像素
                 if (Color.alpha(pixel) >= 128) {
                     validColors.add(pixel)
                 }
             }
         }
+
         if (validColors.isEmpty()) {
             return 0xFFF7F8FA.toInt() // 默认明亮背景
         }
-        // 若采样点大部分亮度较高，取平均色；若大部分亮度较低，取深色
-        var rSum = 0L
-        var gSum = 0L
-        var bSum = 0L
-        for (c in validColors) {
-            rSum += Color.red(c)
-            gSum += Color.green(c)
-            bSum += Color.blue(c)
+
+        // 使用亮度中位数过滤掉边缘杂散点，提取最真实的背景主色
+        val sortedByLuminance = validColors.sortedBy { c ->
+            0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)
         }
-        val count = validColors.size
-        return Color.rgb((rSum / count).toInt(), (gSum / count).toInt(), (bSum / count).toInt())
+        val medianColor = sortedByLuminance[sortedByLuminance.size / 2]
+        return medianColor
     }
 }

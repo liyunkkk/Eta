@@ -16,7 +16,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.github.mangi.eta.core.AndroidAgentLogger
@@ -28,9 +27,9 @@ import kotlin.math.roundToInt
  * 屏幕翻译覆盖层服务。
  *
  * 双窗口架构：
- * 1. 全屏穿透像素级贴合层：
- *    - 抹除原文底色遮罩（AdaptiveEraseDrawable）；
- *    - 自适应高度字号反算（Auto-Fit）；
+ * 1. 全屏穿透单层硬件加速 Canvas 原位渲染层（InPlaceTranslationCanvasView）：
+ *    - 1:1 原地抹除背景；
+ *    - 二分法字号严格原框拟合（Strict In-place Auto-Fit）；
  *    - 点击穿透（FLAG_NOT_TOUCHABLE），完全不干扰底层交互；
  * 2. 液态玻璃悬浮操作胶囊：
  *    - 深浅色自适应、可拖拽贴边吸附；
@@ -38,7 +37,7 @@ import kotlin.math.roundToInt
  */
 internal class ScreenTranslationOverlayService : Service() {
     private var windowManager: WindowManager? = null
-    private var translationRoot: FrameLayout? = null
+    private var canvasOverlayView: InPlaceTranslationCanvasView? = null
     private var controlBubble: LinearLayout? = null
     private var bubbleStatusText: TextView? = null
     private var bubbleIcon: TextView? = null
@@ -73,10 +72,8 @@ internal class ScreenTranslationOverlayService : Service() {
             return
         }
 
-        // ---------- 窗口 1：全屏穿透贴合层 ----------
-        val translationLayer = FrameLayout(this).apply {
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        }
+        // ---------- 窗口 1：全屏穿透单层 Canvas 贴合层 ----------
+        val canvasView = InPlaceTranslationCanvasView(this)
         val translationParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -94,7 +91,7 @@ internal class ScreenTranslationOverlayService : Service() {
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
 
-        runCatching { wm.addView(translationLayer, translationParams) }
+        runCatching { wm.addView(canvasView, translationParams) }
             .onFailure { throwable ->
                 AndroidAgentLogger.warnThrottled("eta_screen_translation_add_failed") {
                     "Screen translation overlay addView failed: type=${throwable.javaClass.simpleName}"
@@ -126,13 +123,13 @@ internal class ScreenTranslationOverlayService : Service() {
                 AndroidAgentLogger.warnThrottled("eta_screen_translation_bubble_failed") {
                     "Screen translation bubble addView failed: ${throwable.javaClass.simpleName}"
                 }
-                runCatching { wm.removeView(translationLayer) }
+                runCatching { wm.removeView(canvasView) }
                 stopSelf()
                 return
             }
 
         windowManager = wm
-        translationRoot = translationLayer
+        canvasOverlayView = canvasView
         controlBubble = bubble
         isAttached.set(true)
         ScreenTranslationController.attachOverlay(this)
@@ -148,90 +145,96 @@ internal class ScreenTranslationOverlayService : Service() {
         val bgColor = if (isDark) BUBBLE_BG_DARK else BUBBLE_BG_LIGHT
         val strokeColor = if (isDark) BUBBLE_STROKE_DARK else BUBBLE_STROKE_LIGHT
         val textColor = if (isDark) TEXT_DARK else TEXT_LIGHT
-        val subColor = if (isDark) SUBTEXT_DARK else SUBTEXT_LIGHT
+        val subTextColor = if (isDark) SUBTEXT_DARK else SUBTEXT_LIGHT
         val dividerColor = if (isDark) DIVIDER_DARK else DIVIDER_LIGHT
 
         val bubble = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                (10 * density).roundToInt(),
                 (6 * density).roundToInt(),
-                (8 * density).roundToInt(),
+                (4 * density).roundToInt(),
                 (6 * density).roundToInt(),
+                (4 * density).roundToInt(),
             )
             background = GradientDrawable().apply {
                 setColor(bgColor)
-                cornerRadius = 18f * density
-                setStroke((1 * density).roundToInt(), strokeColor)
+                cornerRadius = 24f * density
+                setStroke((1f * density).roundToInt(), strokeColor)
             }
-            elevation = 6f * density
+            elevation = 10f * density
         }
 
-        // 左侧操作区域：图标 + 状态文本
-        val mainAction = LinearLayout(this).apply {
+        val mainActionSection = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            isClickable = false
-        }
-        val iconView = TextView(this).apply {
-            text = "🌐"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setPadding(0, 0, (5 * density).roundToInt(), 0)
-        }
-        bubbleIcon = iconView
-        mainAction.addView(iconView)
-
-        val statusView = TextView(this).apply {
-            text = getString(io.github.mangi.eta.R.string.screen_translation_btn_translate)
-            setTextColor(textColor)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            typeface = Typeface.DEFAULT_BOLD
-            includeFontPadding = false
-        }
-        bubbleStatusText = statusView
-        mainAction.addView(statusView)
-        bubble.addView(mainAction)
-
-        // 中间分割线
-        val divider = View(this).apply {
-            setBackgroundColor(dividerColor)
-            val lp = LinearLayout.LayoutParams(
-                (1 * density).roundToInt().coerceAtLeast(1),
-                (13 * density).roundToInt(),
-            ).apply {
-                leftMargin = (8 * density).roundToInt()
-                rightMargin = (6 * density).roundToInt()
-            }
-            layoutParams = lp
-        }
-        bubbleDivider = divider
-        bubble.addView(divider)
-
-        // 右侧独立关闭小按钮：✕
-        val closeBtn = TextView(this).apply {
-            text = "✕"
-            setTextColor(subColor)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            typeface = Typeface.DEFAULT_BOLD
             setPadding(
-                (4 * density).roundToInt(),
+                (6 * density).roundToInt(),
                 (2 * density).roundToInt(),
                 (4 * density).roundToInt(),
                 (2 * density).roundToInt(),
             )
-            includeFontPadding = false
+        }
+
+        val icon = TextView(this).apply {
+            text = "文"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(textColor)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 0, (4 * density).roundToInt(), 0)
+        }
+        bubbleIcon = icon
+        mainActionSection.addView(icon)
+
+        val statusText = TextView(this).apply {
+            text = getString(io.github.mangi.eta.R.string.screen_translation_btn_translate)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(textColor)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        bubbleStatusText = statusText
+        mainActionSection.addView(statusText)
+
+        bubble.addView(mainActionSection)
+
+        val divider = View(this).apply {
+            setBackgroundColor(dividerColor)
+        }
+        bubbleDivider = divider
+        val dividerParams = LinearLayout.LayoutParams(
+            (1f * density).roundToInt(),
+            (14 * density).roundToInt(),
+        ).apply {
+            leftMargin = (4 * density).roundToInt()
+            rightMargin = (4 * density).roundToInt()
+        }
+        bubble.addView(divider, dividerParams)
+
+        val closeBtn = TextView(this).apply {
+            text = "✕"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(subTextColor)
+            setPadding(
+                (6 * density).roundToInt(),
+                (2 * density).roundToInt(),
+                (6 * density).roundToInt(),
+                (2 * density).roundToInt(),
+            )
         }
         bubbleCloseBtn = closeBtn
         bubble.addView(closeBtn)
 
-        // 手势处理
+        closeBtn.setOnClickListener {
+            ScreenTranslationController.stopTranslationSession(this)
+            hideOverlay()
+        }
+
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
         var initialX = 0
         var initialY = 0
         var touchStartX = 0f
         var touchStartY = 0f
         var isDragging = false
-        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop.toFloat()
 
         bubble.setOnTouchListener { _, event ->
             when (event.action) {
@@ -246,8 +249,10 @@ internal class ScreenTranslationOverlayService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - touchStartX).toInt()
                     val dy = (event.rawY - touchStartY).toInt()
-                    if (abs(event.rawX - touchStartX) > touchSlop || abs(event.rawY - touchStartY) > touchSlop) {
+                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
                         isDragging = true
+                    }
+                    if (isDragging) {
                         params.x = initialX + dx
                         params.y = initialY + dy
                         runCatching { wm.updateViewLayout(bubble, params) }
@@ -256,28 +261,26 @@ internal class ScreenTranslationOverlayService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!isDragging) {
-                        val touchX = event.x
-                        val dividerLeft = divider.left
-                        if (touchX >= dividerLeft - 4 * density) {
-                            ScreenTranslationController.stop(applicationContext)
+                        val closeBounds = IntArray(2)
+                        closeBtn.getLocationOnScreen(closeBounds)
+                        val touchX = event.rawX.toInt()
+                        val touchY = event.rawY.toInt()
+                        if (touchX >= closeBounds[0] && touchX <= closeBounds[0] + closeBtn.width &&
+                            touchY >= closeBounds[1] && touchY <= closeBounds[1] + closeBtn.height
+                        ) {
+                            closeBtn.performClick()
                         } else {
-                            if (ScreenTranslationController.hasActiveTranslations() ||
-                                ScreenTranslationController.isTranslating()
-                            ) {
-                                ScreenTranslationController.clearAndStop(applicationContext)
-                            } else {
-                                ScreenTranslationController.requestRefresh()
-                            }
+                            ScreenTranslationController.onBubbleClicked(this)
                         }
                     } else {
                         val screenWidth = resources.displayMetrics.widthPixels
-                        val bubbleWidth = bubble.width.coerceAtLeast((90 * density).roundToInt())
-                        val margin = (10 * density).roundToInt()
-                        params.x = if (params.x + bubbleWidth / 2 < screenWidth / 2) {
-                            margin
+                        val bubbleWidth = bubble.width
+                        val targetX = if (params.x + bubbleWidth / 2 < screenWidth / 2) {
+                            (12 * density).roundToInt()
                         } else {
-                            screenWidth - bubbleWidth - margin
+                            screenWidth - bubbleWidth - (12 * density).roundToInt()
                         }
+                        params.x = targetX
                         runCatching { wm.updateViewLayout(bubble, params) }
                     }
                     true
@@ -291,14 +294,14 @@ internal class ScreenTranslationOverlayService : Service() {
 
     private fun hideOverlay() {
         val wm = windowManager
-        val root = translationRoot
+        val canvasView = canvasOverlayView
         val bubble = controlBubble
         if (wm != null) {
-            if (root != null) runCatching { wm.removeView(root) }
+            if (canvasView != null) runCatching { wm.removeView(canvasView) }
             if (bubble != null) runCatching { wm.removeView(bubble) }
         }
         windowManager = null
-        translationRoot = null
+        canvasOverlayView = null
         controlBubble = null
         bubbleStatusText = null
         bubbleIcon = null
@@ -313,120 +316,20 @@ internal class ScreenTranslationOverlayService : Service() {
     }
 
     internal fun clearBlocks() {
-        translationRoot?.removeAllViews()
+        canvasOverlayView?.clear()
         bubbleStatusText?.text = getString(io.github.mangi.eta.R.string.screen_translation_btn_translate)
     }
 
     /**
-     * 像素级贴合渲染译文层（移植 overlay-translator 算法）：
-     * 1. 使用 AdaptiveEraseDrawable 抹除底层原文字；
-     * 2. 根据原矩形高度反算最佳像素字号，实现精准贴合替换；
-     * 3. 亮色/深色自适应文字对比度。
+     * 单层 Canvas 硬件加速直绘渲染
      */
     internal fun renderBlocks(blocks: List<ScreenTranslationBlock>) {
-        val root = translationRoot ?: return
-        @SuppressLint("DrawAllocation")
-        root.removeAllViews()
-
-        val density = resources.displayMetrics.density
-        val screenWidth = root.resources.displayMetrics.widthPixels
-        val defaultDark = isDarkMode()
-
-        var renderedCount = 0
-        for (block in blocks) {
-            val translated = block.translated ?: continue
-            if (translated.isBlank()) continue
-            if (translated.sameTranslationInputAs(block.source)) continue
-
-            val bounds = block.boundsInScreen
-            val left = bounds.left.coerceAtLeast(0)
-            val top = bounds.top.coerceAtLeast(0)
-            val origWidth = bounds.width()
-            val origHeight = bounds.height()
-            if (origWidth <= 0 || origHeight <= 0) continue
-
-            val maxWidthAllowed = screenWidth - left - (4 * density).roundToInt()
-            if (maxWidthAllowed <= 0) continue
-
-            // 判断背景底色
-            val sampledBg = block.sampledBgColor
-            val isDarkBg = if (sampledBg != null) {
-                isColorDark(sampledBg)
-            } else {
-                defaultDark
-            }
-
-            val blockTextColor = if (isDarkBg) 0xFFF5F5F7.toInt() else 0xFF1C1C1E.toInt()
-            val eraseFillColor = sampledBg ?: if (isDarkBg) BLOCK_BG_DARK else BLOCK_BG_LIGHT
-
-            // 动态字号与排版估算
-            val isSingleLineCandidate = origHeight <= (38 * density).roundToInt()
-            val autoTextSizePx = if (isSingleLineCandidate) {
-                (origHeight * 0.68f).coerceIn(10f * density, 20f * density)
-            } else {
-                val lines = maxOf(2, (origHeight / (18 * density)).roundToInt())
-                ((origHeight / lines) * 0.65f).coerceIn(10f * density, 18f * density)
-            }
-
-            val estCharWidth = autoTextSizePx * 1.02f
-            val estimatedWidth = (translated.length * estCharWidth + 6f * density).roundToInt()
-            val targetWidth = if (isSingleLineCandidate) {
-                maxOf(origWidth, estimatedWidth).coerceAtMost(maxWidthAllowed)
-            } else {
-                maxOf(origWidth, (origWidth * 1.08f).roundToInt()).coerceAtMost(maxWidthAllowed)
-            }
-            if (targetWidth <= 0) continue
-
-            val targetHeight = maxOf(origHeight, (18 * density).roundToInt())
-
-            val textView = TextView(this).apply {
-                text = translated
-                setTextColor(blockTextColor)
-                typeface = Typeface.DEFAULT_BOLD
-                includeFontPadding = false
-                gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, autoTextSizePx)
-                setPadding(
-                    (3 * density).roundToInt(),
-                    (1 * density).roundToInt(),
-                    (3 * density).roundToInt(),
-                    (1 * density).roundToInt(),
-                )
-                if (isSingleLineCandidate) {
-                    maxLines = 1
-                } else {
-                    maxLines = maxOf(2, (origHeight / (16 * density)).roundToInt() + 1)
-                }
-                // 使用自适应抹除遮罩背景
-                background = AdaptiveEraseDrawable(
-                    fillColor = eraseFillColor,
-                    strokeColor = if (isDarkBg) 0x1AFFFFFF else 0x1A000000,
-                    cornerRadiusPx = 3f * density,
-                )
-            }
-
-            val params = FrameLayout.LayoutParams(
-                targetWidth,
-                targetHeight,
-            ).apply {
-                leftMargin = left
-                topMargin = top
-            }
-            root.addView(textView, params)
-            renderedCount++
-        }
-
-        if (renderedCount > 0) {
+        val canvasView = canvasOverlayView ?: return
+        canvasView.setBlocks(blocks)
+        val validCount = blocks.count { it.translated?.isNotBlank() == true }
+        if (validCount > 0) {
             bubbleStatusText?.text = getString(io.github.mangi.eta.R.string.screen_translation_btn_cancel)
         }
-    }
-
-    private fun isColorDark(color: Int): Boolean {
-        val r = Color.red(color)
-        val g = Color.green(color)
-        val b = Color.blue(color)
-        val luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-        return luminance < 0.5
     }
 
     internal companion object {
@@ -444,10 +347,6 @@ internal class ScreenTranslationOverlayService : Service() {
         private val SUBTEXT_LIGHT = 0xFF6C6C70.toInt()
         private val DIVIDER_DARK = 0x26FFFFFF.toInt()
         private val DIVIDER_LIGHT = 0x20000000.toInt()
-
-        // 默认贴合译文卡片配色
-        private val BLOCK_BG_DARK = 0xF218181C.toInt()
-        private val BLOCK_BG_LIGHT = 0xF6FFFFFF.toInt()
 
         fun show(context: Context) {
             context.applicationContext.startService(

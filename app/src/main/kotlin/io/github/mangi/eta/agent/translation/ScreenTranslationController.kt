@@ -40,7 +40,7 @@ internal object ScreenTranslationController {
     private const val MAX_NODES = 120
 
     /** 参与翻译的单块文本最小长度。 */
-    private const val MIN_TEXT_LENGTH = 2
+    private const val MIN_TEXT_LENGTH = 1
 
     /** 单次批量翻译的文本总量上限（字符），防止整屏超长文本一次撑爆请求。 */
     private const val MAX_BATCH_CHARS = 6000
