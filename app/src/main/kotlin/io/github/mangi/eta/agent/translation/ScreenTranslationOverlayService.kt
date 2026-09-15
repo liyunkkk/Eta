@@ -202,7 +202,7 @@ internal class ScreenTranslationOverlayService : Service() {
         }
         bubbleDivider = divider
         val dividerParams = LinearLayout.LayoutParams(
-            (1f * density).roundToInt(),
+            (1f * density).roundToInt().coerceAtLeast(1),
             (14 * density).roundToInt(),
         ).apply {
             leftMargin = (4 * density).roundToInt()
@@ -223,11 +223,6 @@ internal class ScreenTranslationOverlayService : Service() {
         }
         bubbleCloseBtn = closeBtn
         bubble.addView(closeBtn)
-
-        closeBtn.setOnClickListener {
-            ScreenTranslationController.stopTranslationSession(this)
-            hideOverlay()
-        }
 
         val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
         var initialX = 0
@@ -261,16 +256,18 @@ internal class ScreenTranslationOverlayService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!isDragging) {
-                        val closeBounds = IntArray(2)
-                        closeBtn.getLocationOnScreen(closeBounds)
-                        val touchX = event.rawX.toInt()
-                        val touchY = event.rawY.toInt()
-                        if (touchX >= closeBounds[0] && touchX <= closeBounds[0] + closeBtn.width &&
-                            touchY >= closeBounds[1] && touchY <= closeBounds[1] + closeBtn.height
-                        ) {
-                            closeBtn.performClick()
+                        val touchX = event.x
+                        val dividerLeft = divider.left
+                        if (touchX >= dividerLeft - 4 * density) {
+                            ScreenTranslationController.stop(applicationContext)
                         } else {
-                            ScreenTranslationController.onBubbleClicked(this)
+                            if (ScreenTranslationController.hasActiveTranslations() ||
+                                ScreenTranslationController.isTranslating()
+                            ) {
+                                ScreenTranslationController.clearAndStop(applicationContext)
+                            } else {
+                                ScreenTranslationController.requestRefresh()
+                            }
                         }
                     } else {
                         val screenWidth = resources.displayMetrics.widthPixels
