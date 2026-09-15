@@ -658,11 +658,25 @@ internal object ScreenTranslationController {
     }
 
     private fun unescapeJsonString(str: String): String {
-        return str.replace("\\"", "\"")
-            .replace("\\n", "\n")
-            .replace("\\r", "\r")
-            .replace("\\t", "\t")
-            .replace("\\\\", "\\")
+        val sb = StringBuilder(str.length)
+        var i = 0
+        while (i < str.length) {
+            val c = str[i]
+            if (c == '\\' && i + 1 < str.length) {
+                when (str[i + 1]) {
+                    '"' -> { sb.append('"'); i += 2 }
+                    '\\' -> { sb.append('\\'); i += 2 }
+                    'n' -> { sb.append('\n'); i += 2 }
+                    'r' -> { sb.append('\r'); i += 2 }
+                    't' -> { sb.append('\t'); i += 2 }
+                    else -> { sb.append(c); i++ }
+                }
+            } else {
+                sb.append(c)
+                i++
+            }
+        }
+        return sb.toString()
     }
 
     private fun systemPrompt(context: Context): JSONObject {
