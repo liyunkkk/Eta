@@ -306,7 +306,6 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         containerColor = Color.Transparent,
-                        contentColor = Color.Transparent,
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     ) {
                         EtaVoicePanel(
