@@ -124,6 +124,9 @@
         <service
             android:name=".agent.voice.EtaAssistantOverlayService"
             android:exported="false" />
+        <service
+            android:name=".agent.translation.ScreenTranslationOverlayService"
+            android:exported="false" />
 
         <service
             android:name=".agent.runtime.AgentRuntimeService"
