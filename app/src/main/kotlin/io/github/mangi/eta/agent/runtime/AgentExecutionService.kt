@@ -97,15 +97,15 @@ internal class AgentExecutionService : Service() {
         )
 
         val state = executionState
-        val title = state.title ?: getString(R.string.execution_title)
-        val text = state.detail ?: getString(R.string.execution_summary, leases.count())
-        val subText = state.subtitle ?: getString(R.string.app_name)
+        val appTitle = "✨ " + (state.subtitle ?: getString(R.string.app_name))
+        val actionText = state.title ?: getString(R.string.execution_phase_thinking)
+        val detailText = state.detail ?: getString(R.string.execution_summary, leases.count())
 
         val builder = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setSubText(subText)
+            .setContentTitle(appTitle)
+            .setSubText(actionText)
+            .setContentText(detailText)
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -124,16 +124,16 @@ internal class AgentExecutionService : Service() {
         if (expanded != null) {
             builder.setStyle(
                 Notification.BigTextStyle()
-                    .setBigContentTitle(title)
+                    .setBigContentTitle(appTitle)
                     .bigText(expanded)
-                    .setSummaryText(subText),
+                    .setSummaryText(actionText),
             )
         }
 
-        // 小米 HyperOS / MIUI 焦点通知胶囊扩展
+        // 小米 HyperOS / MIUI 焦点通知胶囊扩展：左侧为应用名 ContentTitle (✨ Eta)，右侧为动作 subTitle
         builder.extras.putBoolean("miui.focusNotification", true)
         builder.extras.putBoolean("miui.enableFloat", false)
-        builder.extras.putString("miui.focusNotification.subTitle", subText)
+        builder.extras.putString("miui.focusNotification.subTitle", actionText)
 
         return builder.build()
     }

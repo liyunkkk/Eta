@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="execution_channel">任务运行</string>
-    <string name="execution_title">Eta 正在运行</string>
+    <string name="execution_title">✨ Eta</string>
     <string name="execution_summary">%1$d 项任务正在运行，可返回 Eta 查看进度</string>
     <string name="execution_stop">停止运行任务</string>
-    <string name="execution_phase_preparing">正在准备任务…</string>
+    <string name="execution_phase_preparing">🚀 正在准备…</string>
     <string name="execution_phase_preparing_detail">正在初始化执行环境</string>
-    <string name="execution_phase_thinking">正在深度思考…</string>
+    <string name="execution_phase_thinking">🧠 深度思考…</string>
     <string name="execution_phase_thinking_detail">正在梳理推导步骤</string>
-    <string name="execution_phase_tool">正在执行：%1$s</string>
-    <string name="execution_phase_tool_generic">正在执行外部操作</string>
-    <string name="execution_phase_generating">正在组织回复…</string>
+    <string name="execution_phase_tool">⚡ %1$s</string>
+    <string name="execution_phase_tool_generic">⚡ 执行工具</string>
+    <string name="execution_phase_generating">✍️ 正在回复…</string>
     <string name="execution_phase_generating_detail">正在生成解答内容</string>
+    <string name="execution_phase_translating">🌐 智能翻译…</string>
+    <string name="execution_phase_translating_detail">正在翻译屏幕文本</string>
     <string name="execution_completed_channel">任务完成通知</string>
     <string name="execution_completed_default">任务执行完成</string>
     <string name="execution_failed_default">任务执行失败</string>

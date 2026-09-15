@@ -6,6 +6,7 @@ internal enum class AgentExecutionPhase {
     THINKING,
     TOOL_EXECUTING,
     GENERATING,
+    TRANSLATING,
     GENERIC_RUNNING,
 }
 

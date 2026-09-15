@@ -12,6 +12,9 @@ import io.github.mangi.eta.agent.model.AgentModelRetry
 import io.github.mangi.eta.agent.model.ProviderClientFactory
 import io.github.mangi.eta.agent.model.ProviderRequest
 import io.github.mangi.eta.agent.model.ProviderRequestPurpose
+import io.github.mangi.eta.agent.runtime.AgentExecutionPhase
+import io.github.mangi.eta.agent.runtime.AgentExecutionService
+import io.github.mangi.eta.agent.runtime.AgentExecutionState
 import io.github.mangi.eta.agent.runtime.AgentRunController
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.repository.LanguageSettingsRepository
@@ -25,43 +28,34 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 
 /**
- * 屏幕翻译控制器：屏幕文本采集（无障碍节点树）→ 聚合 → 批量翻译（provider 直调）→ 覆盖层渲染。
+ * 屏幕翻译控制器：屏幕文本采集（无障碍节点树）→ 几何降噪与聚合 → 批量翻译（provider 直调）→ 覆盖层渲染。
  *
- * v1 策略：
- * - 文本来源为无障碍节点 text/desc + boundsInScreen，零截图零 OCR，坐标精确；
- * - 翻译直调 AgentProviderClient（复用 COMPACTION purpose 的轻量通道，无工具、无会话），
- *   避免为每屏翻译起一次 AgentRuntimeService 进程往返；
- * - 文本指纹（去空白哈希）缓存，未变化的区块直接复用上次译文，滚动/局部刷新只翻译增量；
- * - 单一工作线程串行处理，新采集请求到达时丢弃过期帧，防止排队堆积。
+ * 核心设计：
+ * - 灵动岛无缝联动：采集、模型翻译与完成状态实时推送到 Xiaomi HyperOS 焦点通知；
+ * - 空间几何排版：叶子节点优先消除容器与子控件重叠，坐标几何去重保留多处相同文本，保守行合并；
+ * - 轻量级悬浮球协同：支持单击一键翻译、再点击立即取消并清除覆盖层。
  */
 internal object ScreenTranslationController {
-
     private const val TAG_PREFIX = "ScreenTranslation"
+    private const val LEASE_ID = "screen_translation"
 
     /** 单次采集的最大节点数，与 captureNodeSnapshot 上限一致。 */
     private const val MAX_NODES = 120
-
     /** 参与翻译的单块文本最小长度：低于该值的碎字（如单个图标 label）不翻译。 */
     private const val MIN_TEXT_LENGTH = 2
-
     /** 单次批量翻译的文本总量上限（字符），防止整屏超长文本一次撑爆请求。 */
     private const val MAX_BATCH_CHARS = 6000
-
     /** 聚合：同一行内相邻块合并的垂直容差（dp）。 */
-    private const val LINE_MERGE_GAP_DP = 8f
-
+    private const val LINE_MERGE_GAP_DP = 6f
     /** 缓存上限：超过后清空重建，防止长会话内存增长。 */
     private const val CACHE_MAX_ENTRIES = 512
-
     /** 内容变化后的采集防抖（ms）。 */
     private const val CAPTURE_DEBOUNCE_MS = 350L
-
-    /** 采集无障碍事件驱动重试间隔：无障碍服务未连接时退避重试。 */
-    private const val SERVICE_RETRY_MS = 2_000L
 
     private val started = AtomicBoolean(false)
     private val renderPending = AtomicBoolean(false)
     private val frameSeq = AtomicLong(0)
+    private val activeTranslationCount = AtomicLong(0)
 
     private var workerThread: HandlerThread? = null
     private var workerHandler: Handler? = null
@@ -82,6 +76,13 @@ internal object ScreenTranslationController {
         val thread = HandlerThread("eta-screen-translation").apply { start() }
         workerThread = thread
         workerHandler = Handler(thread.looper)
+
+        // 注册前台执行租约并打通灵动岛
+        AgentExecutionService.acquire(context, LEASE_ID) {
+            stop(context)
+        }
+
+        ScreenTranslationOverlayService.show(context)
         AndroidAgentLogger.info("$TAG_PREFIX started")
         scheduleCapture(delayMs = 0)
     }
@@ -95,11 +96,29 @@ internal object ScreenTranslationController {
         mainHandler = null
         appContext = null
         translationCache.clear()
+        activeTranslationCount.set(0)
+
+        // 释放灵动岛与前台保活
+        AgentExecutionService.release(LEASE_ID)
+        AgentExecutionService.resetExecutionState()
+
         ScreenTranslationOverlayService.hide(context)
         AndroidAgentLogger.info("$TAG_PREFIX stopped")
     }
 
     fun isRunning(): Boolean = started.get()
+
+    /** 当前是否已有活跃译文展示中。 */
+    fun hasActiveTranslations(): Boolean = activeTranslationCount.get() > 0
+
+    /** 一键清空译文层并恢复待命状态。 */
+    fun clearAndStop(context: Context) {
+        activeTranslationCount.set(0)
+        clearOverlay()
+        AgentExecutionService.release(LEASE_ID)
+        AgentExecutionService.resetExecutionState()
+        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_active_hint))
+    }
 
     /** 内容变化触发重采集（防抖）。 */
     fun onScreenContentChanged() {
@@ -107,8 +126,14 @@ internal object ScreenTranslationController {
         scheduleCapture()
     }
 
-    /** 手动刷新入口。 */
+    /** 手动刷新/单击悬浮球触发入口。 */
     fun requestRefresh() {
+        val context = appContext
+        if (context != null) {
+            AgentExecutionService.acquire(context, LEASE_ID) {
+                stop(context)
+            }
+        }
         scheduleCapture(delayMs = 0)
     }
 
@@ -134,11 +159,23 @@ internal object ScreenTranslationController {
             AndroidAgentLogger.warnThrottled("screen_translation_no_service") {
                 "Screen translation capture skipped: accessibility service not connected"
             }
-            // 服务未连接不重试采集（等待事件驱动或手动刷新），避免空转
             return
         }
+
         val seq = frameSeq.incrementAndGet()
         val startedAt = SystemClock.elapsedRealtime()
+
+        // 灵动岛状态通知：正在分析屏幕
+        AgentExecutionService.updateExecutionState(
+            AgentExecutionState(
+                phase = AgentExecutionPhase.TOOL_EXECUTING,
+                title = "⚡ 分析屏幕…",
+                detail = "正在提取屏幕文字内容…",
+                showChronometer = true,
+                startedAtElapsedRealtime = startedAt,
+            ),
+        )
+
         val snapshot = runCatching { service.captureNodeSnapshot(MAX_NODES) }
             .getOrElse { throwable ->
                 AndroidAgentLogger.warnThrottled("screen_translation_capture_failed") {
@@ -146,61 +183,96 @@ internal object ScreenTranslationController {
                 }
                 return
             }
+
         val packageName = snapshot?.packageName.orEmpty()
-        if (packageName.isBlank() || packageName == SELF_PACKAGE ||
-            packageName == SYSTEM_UI_PACKAGE
-        ) {
-            // 不翻译自家界面与系统 UI
+        if (packageName.isBlank() || packageName == SELF_PACKAGE || packageName == SYSTEM_UI_PACKAGE) {
             return
         }
+
         val rawNodes = snapshot?.nodes.orEmpty()
         if (rawNodes.isEmpty()) {
             clearOverlay()
             return
         }
+
         val density = appContext?.resources?.displayMetrics?.density ?: 1f
         val blocks = aggregateNodes(rawNodes, density)
         if (blocks.isEmpty()) {
             clearOverlay()
             return
         }
-        lastCaptureAt = SystemClock.elapsedRealtime()
+
         AndroidAgentLogger.debug {
             "$TAG_PREFIX action=capture seq=$seq package=$packageName " +
                 "blocks=${blocks.size} nodes=${rawNodes.size} " +
                 "elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}"
         }
+
         translateAndRender(blocks, seq)
     }
 
-    @Volatile
-    private var lastCaptureAt: Long = 0
-
     /**
      * 从无障碍节点聚合出可翻译文本块：
-     * 1. 只取有文本的可见节点（text / desc）；
-     * 2. 过滤过短文本、无字母噪声（纯数字/符号）、密码框与输入框；
-     * 3. 同行相邻块（垂直中心接近）合并为一行，保持阅读顺序。
+     * 1. 过滤密码、不可用、输入框及无字母噪声；
+     * 2. 叶子节点优先（Leaf First）：消除外层容器节点（整段 desc）与内层子控件文本的双重重叠；
+     * 3. 基于空间几何去重（替代全局文本去重，保留同屏多处相同标签）；
+     * 4. 保守同行相邻块合并。
      */
     private fun aggregateNodes(
         nodes: List<AgentAccessibilityService.UiNode>,
         density: Float,
     ): List<ScreenTranslationBlock> {
-        val candidates = ArrayList<ScreenTranslationBlock>(nodes.size)
-        val seenTexts = HashSet<String>()
+        val rawCandidates = ArrayList<ScreenTranslationBlock>(nodes.size)
         for (node in nodes) {
-            if (node.password || !node.enabled) continue
-            if (node.editable) continue
+            if (node.password || !node.enabled || node.editable) continue
             val text = pickNodeText(node) ?: continue
-            if (text.length < MIN_TEXT_LENGTH) continue
-            if (isNoiseText(text)) continue
-            if (!seenTexts.add(text)) continue
+            if (text.length < MIN_TEXT_LENGTH || isNoiseText(text)) continue
             val bounds = node.bounds
-            if (bounds.isEmpty) continue
-            candidates.add(ScreenTranslationBlock(source = text, boundsInScreen = Rect(bounds)))
+            if (bounds.isEmpty || bounds.width() <= 0 || bounds.height() <= 0) continue
+            rawCandidates.add(ScreenTranslationBlock(source = text, boundsInScreen = Rect(bounds)))
         }
-        if (candidates.size <= 1) return candidates
-        return mergeInline(candidates, density)
+
+        if (rawCandidates.isEmpty()) return emptyList()
+
+        // 步骤 1：消除包含子文本节点的容器大卡片（优先叶子节点，防止叠罗汉）
+        val leafCandidates = ArrayList<ScreenTranslationBlock>(rawCandidates.size)
+        for (i in 0 until rawCandidates.size) {
+            val a = rawCandidates[i]
+            val aBounds = a.boundsInScreen
+            var isParentContainer = false
+            for (j in 0 until rawCandidates.size) {
+                if (i == j) continue
+                val b = rawCandidates[j]
+                val bBounds = b.boundsInScreen
+                // 若 A 矩形包含了 B，且 A 的面积明显大于 B（> 1.25倍），则 A 视为外层容器
+                if (aBounds.contains(bBounds) &&
+                    (aBounds.width() * aBounds.height()) > (bBounds.width() * bBounds.height() * 1.25f)
+                ) {
+                    isParentContainer = true
+                    break
+                }
+            }
+            if (!isParentContainer) {
+                leafCandidates.add(a)
+            }
+        }
+
+        // 步骤 2：空间几何去重（中心点极近且尺寸接近视为物理重复节点；不同位置的同名文本均保留）
+        val spatialDeduplicated = ArrayList<ScreenTranslationBlock>(leafCandidates.size)
+        val tolerance = (5 * density).toInt()
+        for (block in leafCandidates) {
+            val duplicate = spatialDeduplicated.any { existing ->
+                abs(existing.boundsInScreen.centerX() - block.boundsInScreen.centerX()) <= tolerance &&
+                    abs(existing.boundsInScreen.centerY() - block.boundsInScreen.centerY()) <= tolerance &&
+                    abs(existing.boundsInScreen.width() - block.boundsInScreen.width()) <= tolerance * 2
+            }
+            if (!duplicate) {
+                spatialDeduplicated.add(block)
+            }
+        }
+
+        if (spatialDeduplicated.size <= 1) return spatialDeduplicated
+        return mergeInline(spatialDeduplicated, density)
             .sortedWith(compareBy({ it.boundsInScreen.top }, { it.boundsInScreen.left }))
     }
 
@@ -221,8 +293,8 @@ internal object ScreenTranslationController {
     }
 
     /**
-     * 同行合并：垂直中心差在容差内且 bounds 垂直投影重叠的相邻块合并。
-     * 合并逻辑只依据几何信息，与文本内容无关。
+     * 保守同行合并：垂直中心与高度相近，且水平间距较小的相邻文本块合并。
+     * 避免跨列、跨按钮或跨分支名错误合并成超长大句。
      */
     private fun mergeInline(
         blocks: List<ScreenTranslationBlock>,
@@ -233,6 +305,7 @@ internal object ScreenTranslationController {
         val sorted = blocks.sortedWith(compareBy({ it.boundsInScreen.top }, { it.boundsInScreen.left }))
         val rows = ArrayList<ScreenTranslationBlock>(blocks.size)
         var current: ScreenTranslationBlock? = null
+
         for (block in sorted) {
             val head = current
             if (head == null) {
@@ -240,9 +313,12 @@ internal object ScreenTranslationController {
                 continue
             }
             val sameLine = abs(head.boundsInScreen.centerY() - block.boundsInScreen.centerY()) <= gap &&
-                abs(head.boundsInScreen.height() - block.boundsInScreen.height()) <= gap * 2
+                abs(head.boundsInScreen.height() - block.boundsInScreen.height()) <= gap * 1.5f
+            // 横向间隙必须紧邻（<= gap * 1.8f），防止将右侧独立标签或操作合并
+            val horizontalGap = block.boundsInScreen.left - head.boundsInScreen.right
             val horizontalAdjacent = block.boundsInScreen.left >= head.boundsInScreen.left &&
-                (block.boundsInScreen.left - head.boundsInScreen.right) <= gap * 3
+                horizontalGap in 0..(gap * 1.8f).toInt()
+
             if (sameLine && horizontalAdjacent) {
                 current = head.copy(
                     source = head.source + " " + block.source,
@@ -268,8 +344,9 @@ internal object ScreenTranslationController {
 
     private fun translateAndRender(blocks: List<ScreenTranslationBlock>, seq: Long) {
         val workBlocks = blocks.map { it }.toMutableList()
+
         // 1. 缓存命中的直接复用
-        val pending = ArrayList<Pair<Int, String>>() // index -> fingerprint
+        val pending = ArrayList<Pair<Int, String>>()
         blocks.forEachIndexed { index, block ->
             val fp = fingerprint(block.source)
             val cached = translationCache[fp]
@@ -279,11 +356,22 @@ internal object ScreenTranslationController {
                 pending.add(index to fp)
             }
         }
-        // 2. 全部命中：直接渲染
+
+        // 2. 全部命中：直接渲染并通知灵动岛
         if (pending.isEmpty()) {
+            activeTranslationCount.set(workBlocks.size.toLong())
             renderOnMain(workBlocks)
+            AgentExecutionService.updateExecutionState(
+                AgentExecutionState(
+                    phase = AgentExecutionPhase.IDLE,
+                    title = "✅ 翻译完成",
+                    detail = "已贴合 ${workBlocks.size} 处译文",
+                    showChronometer = false,
+                ),
+            )
             return
         }
+
         // 3. 分批翻译：单批不超过 MAX_BATCH_CHARS 字符
         var batchStart = 0
         while (batchStart < pending.size) {
@@ -299,10 +387,21 @@ internal object ScreenTranslationController {
             val batch = pending.subList(batchStart, batchEnd)
             val ok = runTranslationBatch(blocks, batch, workBlocks)
             if (!ok) return
-            // 每批渲染一次，让用户尽早看到部分译文
+
+            activeTranslationCount.set(workBlocks.count { it.translated != null }.toLong())
             renderOnMain(workBlocks)
             batchStart = batchEnd
         }
+
+        AgentExecutionService.updateExecutionState(
+            AgentExecutionState(
+                phase = AgentExecutionPhase.IDLE,
+                title = "✅ 翻译完成",
+                detail = "已贴合 ${workBlocks.size} 处译文",
+                showChronometer = false,
+            ),
+        )
+
         AndroidAgentLogger.debug {
             "$TAG_PREFIX action=translate_done seq=$seq total=${blocks.size} translated=${pending.size}"
         }
@@ -324,21 +423,16 @@ internal object ScreenTranslationController {
         return repoConfig ?: clientConfig
     }
 
-    /**
-     * 执行一次批量翻译：构建编号 JSON 列表 prompt，解析响应。
-     * 返回 false 表示本帧放弃（服务停止/模型失败）。
-     */
     private fun runTranslationBatch(
         blocks: List<ScreenTranslationBlock>,
         batch: List<Pair<Int, String>>,
         workBlocks: MutableList<ScreenTranslationBlock>,
     ): Boolean {
         val context = appContext ?: return false
-        val config = resolveRuntimeConfig()
-            ?: run {
-                postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_no_key))
-                return false
-            }
+        val config = resolveRuntimeConfig() ?: run {
+            postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_no_key))
+            return false
+        }
         if (config.apiKey.isBlank()) {
             AndroidAgentLogger.warnThrottled("screen_translation_no_api_key") {
                 "Screen translation failed: API key is blank for provider ${config.providerName}"
@@ -346,12 +440,25 @@ internal object ScreenTranslationController {
             postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_no_key))
             return false
         }
+
+        // 推送灵动岛与悬浮窗状态：正在翻译
         updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_translating))
+        AgentExecutionService.updateExecutionState(
+            AgentExecutionState(
+                phase = AgentExecutionPhase.TRANSLATING,
+                title = "🌐 智能翻译…",
+                detail = "正在直连模型翻译 ${batch.size} 处文本…",
+                showChronometer = true,
+                startedAtElapsedRealtime = SystemClock.elapsedRealtime(),
+            ),
+        )
+
         val provider = ProviderClientFactory.getClient(config)
         val controller = AgentRunController()
         val retry = AgentModelRetry()
         val messages = JSONArray()
         messages.put(systemPrompt(context))
+
         val items = JSONArray()
         batch.forEach { (index, _) ->
             items.put(
@@ -362,6 +469,7 @@ internal object ScreenTranslationController {
         }
         val payload = JSONObject().put("items", items)
         messages.put(AgentConversationCodec.userTextMessage(payload.toString()))
+
         val request = ProviderRequest(
             config = config.copy(
                 hostedWebSearchEnabled = false,
@@ -372,6 +480,7 @@ internal object ScreenTranslationController {
             tools = JSONArray(),
             purpose = ProviderRequestPurpose.COMPACTION,
         )
+
         val response = try {
             retry.complete(
                 initialRound = 0,
@@ -389,11 +498,13 @@ internal object ScreenTranslationController {
             postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_failed))
             return false
         }
+
         val content = response.assistantMessage.optString("content").trim()
         if (content.isBlank() || content == "null") {
             postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_failed))
             return false
         }
+
         val parsed = runCatching { parseTranslations(content) }.getOrNull()
         if (parsed == null) {
             AndroidAgentLogger.warnThrottled("screen_translation_parse_failed") {
@@ -402,31 +513,26 @@ internal object ScreenTranslationController {
             postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_failed))
             return false
         }
+
         for ((index, translation) in parsed) {
             if (translation.isBlank()) continue
             val fp = batch.firstOrNull { it.first == index }?.second ?: continue
             translationCache[fp] = translation
             if (translationCache.size > CACHE_MAX_ENTRIES) {
-                // 容量保护：超限全清后重建（缓存价值主要在短会话滚动场景）
                 translationCache.clear()
                 translationCache[fp] = translation
             }
             workBlocks[index] = blocks[index].copy(translated = translation)
         }
-        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_active_hint))
+
+        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_close))
         return true
     }
 
-    /**
-     * 解析模型返回。兼容三种格式：
-     * 1. JSON 数组 [{"id":n,"text":"..."}]；
-     * 2. JSON 对象 {"items":[{"id":n,"text":"..."}]}；
-     * 3. 行格式 “id|译文” 每行一条（模型未按格式输出时的兜底）。
-     */
     private fun parseTranslations(content: String): List<Pair<Int, String>>? {
         val trimmed = content.trim()
-        // 剥离可能的 markdown 代码围栏
         val jsonText = strippedOfCodeFence(trimmed)
+
         if (jsonText.startsWith("[")) {
             runCatching { JSONArray(jsonText) }.getOrNull()?.let { array ->
                 val out = ArrayList<Pair<Int, String>>(array.length())
@@ -463,7 +569,7 @@ internal object ScreenTranslationController {
                 }
             }
         }
-        // 行格式兜底
+
         val lines = trimmed.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val out = ArrayList<Pair<Int, String>>(lines.size)
         for (line in lines) {
@@ -521,9 +627,8 @@ internal object ScreenTranslationController {
     }
 
     // ------------------------------------------------------------------
-    // 渲染
+    // 渲染与状态分发
     // ------------------------------------------------------------------
-
 
     private fun renderOnMain(blocks: List<ScreenTranslationBlock>) {
         val main = mainHandler ?: return
@@ -544,7 +649,9 @@ internal object ScreenTranslationController {
 
     private fun clearOverlay() {
         val main = mainHandler ?: return
-        main.post { overlayService?.renderBlocks(emptyList()) }
+        main.post {
+            overlayService?.clearBlocks()
+        }
     }
 
     private fun updateOverlayStatus(text: String) {
@@ -557,6 +664,14 @@ internal object ScreenTranslationController {
             "Screen translation error: $displayMessage"
         }
         updateOverlayStatus(displayMessage)
+        AgentExecutionService.updateExecutionState(
+            AgentExecutionState(
+                phase = AgentExecutionPhase.IDLE,
+                title = "⚠️ 翻译异常",
+                detail = displayMessage,
+                showChronometer = false,
+            ),
+        )
     }
 
     // ------------------------------------------------------------------
