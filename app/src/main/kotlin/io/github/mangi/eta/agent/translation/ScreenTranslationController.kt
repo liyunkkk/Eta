@@ -614,7 +614,7 @@ internal object ScreenTranslationController {
             val match = linePattern.matchEntire(line)
             if (match != null) {
                 val id = match.groupValues[1].toIntOrNull()
-                val text = match.groupValues[2].trim().removeSurrounding(""")
+                val text = match.groupValues[2].trim().removePrefix("\"").removeSuffix("\"").removePrefix("'").removeSuffix("'")
                 if (id != null && id >= 0 && text.isNotBlank()) {
                     out.add(id to text)
                 }
