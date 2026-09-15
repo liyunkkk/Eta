@@ -18,8 +18,6 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
-import android.window.OnBackInvokedCallback
-import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -37,6 +35,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.navigationevent.NavigationEventDispatcher
+import androidx.navigationevent.NavigationEventDispatcherOwner
+import androidx.navigationevent.NavigationEventHandler
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.OnBackInvokedDefaultInput
+import androidx.navigationevent.setViewTreeNavigationEventDispatcherOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
@@ -106,7 +110,8 @@ import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
  * 系统助理会话只负责承接电源键入口；这里固定使用全屏 TYPE_APPLICATION_OVERLAY，
  * 让输入法、动画和厂商助手式浮窗拥有同一个窗口生命周期。
  */
-internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
+internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner,
+    NavigationEventDispatcherOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -125,8 +130,26 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     private var windowParams: WindowManager.LayoutParams? = null
     private var detachingWindowView: View? = null
     private val windowDetachCallbacks = mutableListOf<(Boolean) -> Unit>()
-    private var backInvokedDispatcher: OnBackInvokedDispatcher? = null
-    private var backInvokedCallback: OnBackInvokedCallback? = null
+    // 浮窗宿主缺失 Activity 的 NavigationEventDispatcherOwner 能力（miuix Overlay* 弹窗
+    // 内部的 NavigationBackHandler 依赖该 owner，缺失会直接 IllegalStateException 崩溃），
+    // 由 Service 亲自承担宿主职责：root dispatcher + 系统返回事件输入 + 常驻返回 handler。
+    private val backingNavigationEventDispatcher = NavigationEventDispatcher(
+        onBackCompletedFallback = ::dismissAndStop,
+    )
+    private var navigationEventInput: OnBackInvokedDefaultInput? = null
+    private var overlayBackHandler: OverlayPanelBackHandler? = null
+
+    /** 弹窗常驻返回 handler：弹窗打开时让路（弹窗的 handler 后注册、LIFO 优先），
+     *  无弹窗时承接返回手势关闭整个浮窗面板。 */
+    private inner class OverlayPanelBackHandler : NavigationEventHandler<NavigationEventInfo>(
+        initialInfo = NavigationEventInfo.None,
+        isBackEnabled = true,
+        isForwardEnabled = false,
+    ) {
+        override fun onBackCompleted() {
+            dismissAndStop()
+        }
+    }
     private var runJob: Job? = null
     private var entryCaptureJob: Job? = null
     private var activeRunId: String? = null
@@ -144,6 +167,8 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
+    override val navigationEventDispatcher: NavigationEventDispatcher
+        get() = backingNavigationEventDispatcher
 
     override fun onCreate() {
         super.onCreate()
@@ -173,6 +198,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         screenContextAttachment = null
         cancelCurrentRun()
         removeWindow()
+        runCatching { backingNavigationEventDispatcher.dispose() }
         scope.cancel()
         cancellationExecutor.shutdown()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
@@ -380,17 +406,18 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         registerSystemBackCallback(view)
         view.requestFocus()
     }
-
     private fun createComposeView(content: @Composable () -> Unit): ComposeView =
         ComposeView(this).apply {
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             isFocusableInTouchMode = true
             setViewTreeLifecycleOwner(this@EtaAssistantOverlayService)
             setViewTreeSavedStateRegistryOwner(this@EtaAssistantOverlayService)
+            // miuix Overlay* 弹窗内部的 NavigationBackHandler 通过 View 树解析
+            // NavigationEventDispatcherOwner；Service 无 Activity 宿主，必须由本类亲自提供。
+            setViewTreeNavigationEventDispatcherOwner(this@EtaAssistantOverlayService)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent(content)
         }
-
     private fun registerSystemBackCallback(view: View) {
         unregisterSystemBackCallback()
         val dispatcher = view.findOnBackInvokedDispatcher()
@@ -398,22 +425,36 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             AndroidAgentLogger.warn("Eta assistant overlay back dispatcher unavailable")
             return
         }
-        val callback = OnBackInvokedCallback(::dismissAndStop)
-        dispatcher.registerOnBackInvokedCallback(
-            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
-            callback,
-        )
-        backInvokedDispatcher = dispatcher
-        backInvokedCallback = callback
+        // 系统返回事件经 DEFAULT 输入进入 dispatcher；miuix 弹窗 handler 与常驻面板 handler
+        // 同为 DEFAULT 优先级、LIFO 后注册者优先：弹窗打开时先消费返回（关闭弹窗），
+        // 弹窗关闭后常驻 handler / fallback 关闭整个浮窗面板。
+        val input = OnBackInvokedDefaultInput(dispatcher)
+        runCatching {
+            backingNavigationEventDispatcher.addInput(
+                input,
+                NavigationEventDispatcher.PRIORITY_DEFAULT,
+            )
+            val handler = OverlayPanelBackHandler()
+            backingNavigationEventDispatcher.addHandler(
+                handler,
+                NavigationEventDispatcher.PRIORITY_DEFAULT,
+            )
+            overlayBackHandler = handler
+        }.onFailure { throwable ->
+            AndroidAgentLogger.warnThrottled("eta_assistant_overlay_nav_input_failed") {
+                "Eta assistant overlay navigation event input failed: type=${throwable.javaClass.simpleName}"
+            }
+        }
+        navigationEventInput = input
     }
 
     private fun unregisterSystemBackCallback() {
-        val dispatcher = backInvokedDispatcher
-        val callback = backInvokedCallback
-        backInvokedDispatcher = null
-        backInvokedCallback = null
-        if (dispatcher != null && callback != null) {
-            dispatcher.unregisterOnBackInvokedCallback(callback)
+        overlayBackHandler?.remove()
+        overlayBackHandler = null
+        val input = navigationEventInput
+        navigationEventInput = null
+        if (input != null) {
+            runCatching { backingNavigationEventDispatcher.removeInput(input) }
         }
     }
 
