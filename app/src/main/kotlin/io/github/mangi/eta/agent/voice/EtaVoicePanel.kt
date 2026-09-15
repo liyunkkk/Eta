@@ -462,9 +462,13 @@ private fun BoxScope.AssistantPanel(
     )
     val currentAnimatedHeight = rememberUpdatedState(animatedHeightPx)
     val sheetHeightPx = draggedHeightPx ?: animatedHeightPx
-    val visibleSheetHeightPx = sheetHeightPx.coerceAtMost(
-        (maxContentHeightPx - imeOverlapPx).coerceAtLeast(0f),
-    )
+    val composerReservedHeightPx = with(density) { 140.dp.toPx() }
+    val maxAvailableForSheetPx = if (imeOverlapPx > 0) {
+        (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
+    } else {
+        maxContentHeightPx
+    }
+    val visibleSheetHeightPx = sheetHeightPx.coerceAtMost(maxAvailableForSheetPx)
     val nearFullscreen = sheetHeightPx >= maxContentHeightPx * 0.88f
     val handoffReady = canOpenConversation && nearFullscreen &&
         (handoffPullPx >= handoffThresholdPx ||
@@ -710,7 +714,7 @@ private fun BoxScope.AssistantPanel(
                     start = 16.dp,
                     end = 16.dp,
                     top = 8.dp,
-                    bottom = bottomInset + 10.dp,
+                    bottom = if (imeOverlapPx > 0) bottomInset + 4.dp else bottomInset + 10.dp,
                 ),
         )
     }

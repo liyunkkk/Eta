@@ -87,7 +87,7 @@ import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowListPopup
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 
 private val SendButtonVisualSize = ChatInputActionIconSize
 private val SendIconSize = 16.dp
@@ -221,6 +221,7 @@ internal fun AgentChatInputBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 84.dp)
                     .dropShadow(
                         shape = InputContainerShape,
                         shadow = Shadow(
@@ -243,7 +244,7 @@ internal fun AgentChatInputBar(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 40.dp)
+                        .heightIn(min = 36.dp)
                         .padding(horizontal = 8.dp, vertical = 5.dp),
                     contentAlignment = Alignment.TopStart,
                 ) {
@@ -448,7 +449,7 @@ private fun ThinkingEffortChip(
                 tint = contentColor,
             )
         }
-        WindowListPopup(
+        OverlayListPopup(
             show = showPopup && menuEnabled && popupAnchorTopPx > 0,
             popupPositionProvider = popupPositionProvider,
             alignment = PopupPositionProvider.Align.TopStart,

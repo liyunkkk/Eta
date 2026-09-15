@@ -59,8 +59,8 @@ import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
-import top.yukonga.miuix.kmp.window.WindowListPopup
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 
 internal val ChatInputPopupMargin = 8.dp
 internal val ChatInputActionSize = 40.dp
@@ -143,7 +143,7 @@ internal fun AgentAttachmentPickerButton(
                 tint = MiuixTheme.colorScheme.onSurface,
             )
         }
-        WindowListPopup(
+        OverlayListPopup(
             show = showPopup && popupAnchorTopPx > 0,
             popupPositionProvider = remember(popupAnchorTopPx) {
                 InputPopupPositionProvider(popupAnchorTopPx)
@@ -210,7 +210,7 @@ internal fun AgentAttachmentPickerButton(
         }
     }
 
-    WindowDialog(
+    OverlayDialog(
         show = showPathDialog,
         title = stringResource(R.string.ui_input_file_path_36d474),
         summary = stringResource(R.string.ui_supports_files_and_folders_under_internal_storage_or_520786),

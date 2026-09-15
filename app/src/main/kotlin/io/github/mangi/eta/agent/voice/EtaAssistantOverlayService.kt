@@ -20,6 +20,8 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -27,6 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
@@ -37,6 +41,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import top.yukonga.miuix.kmp.basic.Scaffold
 import io.github.mangi.eta.EtaApp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.accessibility.AgentAccessibilityService
@@ -298,37 +303,44 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                 // ColorOS 在 Overlay 窗口切换期间可能短暂使用软件画布；RuntimeShader
                 // 无法在该画布绘制，因此浮窗统一使用 Miuix 的圆角回退路径。
                 CompositionLocalProvider(LocalSquircleEnabled provides false) {
-                    EtaVoicePanel(
-                        state = uiState,
-                        input = inputText,
-                        inputFocusRequestKey = inputFocusRequestKey,
-                        onInputChange = { inputText = it },
-                        onScreenContextSelect = ::selectScreenContext,
-                        onScreenContextRemove = ::removeScreenContext,
-                        onScreenTranslation = ::startScreenTranslation,
-                        onToggleHistoryMenu = ::toggleHistoryMenu,
-                        onSelectConversation = ::selectConversation,
-                        onNewConversation = ::newConversation,
-                        onSubmit = ::submitPrompt,
-                        onStop = ::stopCurrentRun,
-                        onClose = ::dismissAndStop,
-                        canOpenConversation = activeRunId == null &&
-                            (uiState.messages.any { message ->
-                                message is AgentMessageUi && message.content.isNotBlank()
-                            } || currentConversationId != null),
-                        exitRequested = handoffExitRequested,
-                        onOpenConversation = ::openConversation,
-                        onAttachImage = ::attachImage,
-                        onRemoveImage = ::removePendingImage,
-                        onAttachFiles = ::attachFiles,
-                        onAttachFolder = ::attachFolder,
-                        onAttachFilePath = ::attachFilePath,
-                        onRemoveFileReference = ::removePendingFileReference,
-                        onReasoningEffortChange = ::updateReasoningEffort,
-                        onModelSelected = ::selectModel,
-                        onCompactContext = ::compactContext,
-                        onOpenModelProviders = ::openModelProviders,
-                    )
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = Color.Transparent,
+                        contentColor = Color.Transparent,
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    ) {
+                        EtaVoicePanel(
+                            state = uiState,
+                            input = inputText,
+                            inputFocusRequestKey = inputFocusRequestKey,
+                            onInputChange = { inputText = it },
+                            onScreenContextSelect = ::selectScreenContext,
+                            onScreenContextRemove = ::removeScreenContext,
+                            onScreenTranslation = ::startScreenTranslation,
+                            onToggleHistoryMenu = ::toggleHistoryMenu,
+                            onSelectConversation = ::selectConversation,
+                            onNewConversation = ::newConversation,
+                            onSubmit = ::submitPrompt,
+                            onStop = ::stopCurrentRun,
+                            onClose = ::dismissAndStop,
+                            canOpenConversation = activeRunId == null &&
+                                (uiState.messages.any { message ->
+                                    message is AgentMessageUi && message.content.isNotBlank()
+                                } || currentConversationId != null),
+                            exitRequested = handoffExitRequested,
+                            onOpenConversation = ::openConversation,
+                            onAttachImage = ::attachImage,
+                            onRemoveImage = ::removePendingImage,
+                            onAttachFiles = ::attachFiles,
+                            onAttachFolder = ::attachFolder,
+                            onAttachFilePath = ::attachFilePath,
+                            onRemoveFileReference = ::removePendingFileReference,
+                            onReasoningEffortChange = ::updateReasoningEffort,
+                            onModelSelected = ::selectModel,
+                            onCompactContext = ::compactContext,
+                            onOpenModelProviders = ::openModelProviders,
+                        )
+                    }
                 }
             }
         }
