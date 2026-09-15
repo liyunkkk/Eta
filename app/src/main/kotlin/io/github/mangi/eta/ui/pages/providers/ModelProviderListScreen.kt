@@ -53,6 +53,7 @@ internal fun ModelProviderListScreen(
     val scope = rememberCoroutineScope()
     val providers by ProviderRepository.providersFlow().collectAsState(initial = emptyList())
     val selectedProviderId by RuntimeConfigRepository.selectedProviderIdFlow().collectAsState(initial = null)
+    val selectedTranslationProviderId by RuntimeConfigRepository.selectedTranslationProviderIdFlow().collectAsState(initial = null)
     var searchQuery by remember { mutableStateOf("") }
     var providerToDelete by remember { mutableStateOf<ProviderSetting?>(null) }
 
@@ -130,6 +131,7 @@ internal fun ModelProviderListScreen(
                         ProviderListItem(
                             provider = provider,
                             isSelected = provider.id == selectedProviderId,
+                            isTranslationSelected = provider.id == selectedTranslationProviderId,
                             onOpen = { onNavigate(AppRoute.ModelProviderDetail(provider.id)) },
                             onDelete = if (!provider.isBuiltIn) {
                                 { providerToDelete = provider }
@@ -179,6 +181,7 @@ internal fun ModelProviderListScreen(
 private fun ProviderListItem(
     provider: ProviderSetting,
     isSelected: Boolean,
+    isTranslationSelected: Boolean = false,
     onOpen: () -> Unit,
     onDelete: (() -> Unit)?,
     onSelect: () -> Unit,
@@ -217,9 +220,10 @@ private fun ProviderListItem(
                     provider.typeLabel,
                     pluralStringResource(R.plurals.provider_models_count, provider.models.size, provider.models.size),
                     stringResource(R.string.ui_built_in_09ceea).takeIf { provider.isBuiltIn },
+                    stringResource(R.string.screen_translation_translation_api_badge).takeIf { isTranslationSelected },
                 ).joinToString(" · "),
                 style = MiuixTheme.textStyles.footnote1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                color = if (isTranslationSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(top = 6.dp),
             )
             if (!provider.isEnabled) {

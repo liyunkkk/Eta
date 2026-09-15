@@ -30,6 +30,10 @@ internal object RuntimeConfigRepository {
 
     fun selectedModelIdFlow() = SettingsDataStore.selectedModelIdFlow()
 
+    fun selectedTranslationProviderIdFlow() = SettingsDataStore.selectedTranslationProviderIdFlow()
+
+    fun selectedTranslationModelIdFlow() = SettingsDataStore.selectedTranslationModelIdFlow()
+
     suspend fun selectedProvider(): ProviderSetting? {
         val settings = ProviderRepository.repairSelection()
         return settings.selectedProviderId?.let { ProviderRepository.providerById(it) }
@@ -65,12 +69,56 @@ internal object RuntimeConfigRepository {
         ProviderRepository.repairSelection()
     }
 
+    suspend fun setSelectedTranslationProviderId(id: String?) {
+        val settings = SettingsDataStore.settings()
+        val provider = id?.let { ProviderRepository.providerById(it) }
+            ?.takeIf { it.isEnabled }
+        val activeModel = provider
+            ?.takeIf { it.id == settings.selectedTranslationProviderId }
+            ?.models
+            ?.firstOrNull { it.id == settings.selectedTranslationModelId && it.isEnabled }
+        val rememberedModelId = provider?.let {
+            SettingsDataStore.selectedTranslationModelIdForProvider(it.id)
+        }
+        val model = activeModel ?: provider?.selectedOrFirstModel(rememberedModelId)
+        SettingsDataStore.setTranslationSelection(
+            providerId = provider?.id,
+            modelId = model?.id,
+        )
+    }
+
+    suspend fun setSelectedTranslationModelId(id: String?) {
+        val provider = id?.let { ProviderRepository.providerByModelId(it) }
+            ?.takeIf { it.isEnabled }
+        val model = provider?.models?.firstOrNull { it.id == id && it.isEnabled }
+        SettingsDataStore.setTranslationSelection(
+            providerId = provider?.id,
+            modelId = model?.id,
+        )
+    }
+
     suspend fun currentRuntimeConfig(): AgentModelClient.ModelConfig? {
         ProviderRepository.ensureBuiltInsMerged()
         val settings = ProviderRepository.repairSelection()
         val provider = settings.selectedProviderId?.let { ProviderRepository.providerById(it) } ?: return null
         val model = provider.selectedOrFirstModel(settings.selectedModelId) ?: return null
         return buildRuntimeConfig(provider, model)
+    }
+
+    suspend fun translationRuntimeConfig(): AgentModelClient.ModelConfig? {
+        ProviderRepository.ensureBuiltInsMerged()
+        val settings = SettingsDataStore.settings()
+        val translationProviderId = settings.selectedTranslationProviderId
+        if (translationProviderId != null) {
+            val provider = ProviderRepository.providerById(translationProviderId)?.takeIf { it.isEnabled }
+            if (provider != null) {
+                val model = provider.selectedOrFirstModel(settings.selectedTranslationModelId)
+                if (model != null) {
+                    return buildRuntimeConfig(provider, model)
+                }
+            }
+        }
+        return currentRuntimeConfig()
     }
 
     suspend fun syncToRemotePreferences(service: XposedService?): Boolean {

@@ -24,9 +24,10 @@ import kotlinx.coroutines.flow.map
 
 internal object SettingsDataStore {
     private const val STORE_NAME = "eta_settings"
-
     private val SELECTED_PROVIDER_ID = stringPreferencesKey("selected_provider_id")
     private val SELECTED_MODEL_ID = stringPreferencesKey("selected_model_id")
+    private val SELECTED_TRANSLATION_PROVIDER_ID = stringPreferencesKey("selected_translation_provider_id")
+    private val SELECTED_TRANSLATION_MODEL_ID = stringPreferencesKey("selected_translation_model_id")
     private val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
     private val LINUX_DISTRIBUTION = stringPreferencesKey("linux_distribution")
     private val APPEARANCE_THEME_MODE = stringPreferencesKey("appearance_theme_mode")
@@ -42,6 +43,7 @@ internal object SettingsDataStore {
         booleanPreferencesKey("appearance_predictive_back_enabled")
     private val APPEARANCE_INTERFACE_SCALE = floatPreferencesKey("appearance_interface_scale")
     private const val SELECTED_MODEL_BY_PROVIDER_PREFIX = "selected_model_id_by_provider."
+    private const val SELECTED_TRANSLATION_MODEL_BY_PROVIDER_PREFIX = "selected_translation_model_id_by_provider."
 
     private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = STORE_NAME)
 
@@ -76,6 +78,8 @@ internal object SettingsDataStore {
             val updated = transform(current)
             prefs.putOrRemove(SELECTED_PROVIDER_ID, updated.selectedProviderId)
             prefs.putOrRemove(SELECTED_MODEL_ID, updated.selectedModelId)
+            prefs.putOrRemove(SELECTED_TRANSLATION_PROVIDER_ID, updated.selectedTranslationProviderId)
+            prefs.putOrRemove(SELECTED_TRANSLATION_MODEL_ID, updated.selectedTranslationModelId)
             prefs[MEMORY_ENABLED] = updated.memoryEnabled
             prefs.putAppearance(updated.appearance.normalized())
         }
@@ -86,6 +90,12 @@ internal object SettingsDataStore {
 
     fun selectedModelIdFlow(): Flow<String?> =
         settingsFlow().map { it.selectedModelId }
+
+    fun selectedTranslationProviderIdFlow(): Flow<String?> =
+        settingsFlow().map { it.selectedTranslationProviderId }
+
+    fun selectedTranslationModelIdFlow(): Flow<String?> =
+        settingsFlow().map { it.selectedTranslationModelId }
 
     suspend fun selectedModelIdForProvider(providerId: String): String? {
         ensureInitialized()
@@ -98,6 +108,20 @@ internal object SettingsDataStore {
                 }
             }
             .map { prefs -> prefs[selectedModelByProviderKey(providerId)] }
+            .first()
+    }
+
+    suspend fun selectedTranslationModelIdForProvider(providerId: String): String? {
+        ensureInitialized()
+        return dataStore.data
+            .catch { cause ->
+                if (cause is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw cause
+                }
+            }
+            .map { prefs -> prefs[selectedTranslationModelByProviderKey(providerId)] }
             .first()
     }
 
@@ -137,6 +161,30 @@ internal object SettingsDataStore {
 
     suspend fun setSelectedModelId(id: String?) {
         updateSettings { it.copy(selectedModelId = id) }
+    }
+
+    suspend fun setSelectedTranslationProviderId(id: String?) {
+        updateSettings { it.copy(selectedTranslationProviderId = id) }
+    }
+
+    suspend fun setSelectedTranslationModelId(id: String?) {
+        updateSettings { it.copy(selectedTranslationModelId = id) }
+    }
+
+    suspend fun setTranslationSelection(providerId: String?, modelId: String?) {
+        ensureInitialized()
+        dataStore.edit { prefs ->
+            val previousProviderId = prefs[SELECTED_TRANSLATION_PROVIDER_ID]
+            val previousModelId = prefs[SELECTED_TRANSLATION_MODEL_ID]
+            if (previousProviderId != null && previousModelId != null) {
+                prefs[selectedTranslationModelByProviderKey(previousProviderId)] = previousModelId
+            }
+            prefs.putOrRemove(SELECTED_TRANSLATION_PROVIDER_ID, providerId)
+            prefs.putOrRemove(SELECTED_TRANSLATION_MODEL_ID, modelId)
+            if (providerId != null && modelId != null) {
+                prefs[selectedTranslationModelByProviderKey(providerId)] = modelId
+            }
+        }
     }
 
     suspend fun setSelection(providerId: String?, modelId: String?) {
@@ -191,6 +239,9 @@ internal object SettingsDataStore {
     private fun selectedModelByProviderKey(providerId: String): Preferences.Key<String> =
         stringPreferencesKey("$SELECTED_MODEL_BY_PROVIDER_PREFIX$providerId")
 
+    private fun selectedTranslationModelByProviderKey(providerId: String): Preferences.Key<String> =
+        stringPreferencesKey("$SELECTED_TRANSLATION_MODEL_BY_PROVIDER_PREFIX$providerId")
+
     private fun MutablePreferences.putOrRemove(key: Preferences.Key<String>, value: String?) {
         if (value.isNullOrBlank()) {
             remove(key)
@@ -202,6 +253,8 @@ internal object SettingsDataStore {
     private fun Preferences.toSettings(): Settings = Settings(
         selectedProviderId = this[SELECTED_PROVIDER_ID],
         selectedModelId = this[SELECTED_MODEL_ID],
+        selectedTranslationProviderId = this[SELECTED_TRANSLATION_PROVIDER_ID],
+        selectedTranslationModelId = this[SELECTED_TRANSLATION_MODEL_ID],
         memoryEnabled = this[MEMORY_ENABLED] ?: true,
         appearance = AppearanceSettings(
             themeMode = AppearanceThemeMode.fromPersistedValue(this[APPEARANCE_THEME_MODE]),

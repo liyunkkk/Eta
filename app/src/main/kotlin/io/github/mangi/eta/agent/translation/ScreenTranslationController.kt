@@ -65,10 +65,11 @@ internal object ScreenTranslationController {
     /** 译文缓存：文本指纹 -> 译文。 */
     private val translationCache = ConcurrentHashMap<String, String>()
 
+    private val isTranslating = AtomicBoolean(false)
+
     // ------------------------------------------------------------------
     // 生命周期
     // ------------------------------------------------------------------
-
     fun start(context: Context) {
         if (!started.compareAndSet(false, true)) return
         appContext = context.applicationContext
@@ -76,19 +77,16 @@ internal object ScreenTranslationController {
         val thread = HandlerThread("eta-screen-translation").apply { start() }
         workerThread = thread
         workerHandler = Handler(thread.looper)
-
-        // 注册前台执行租约并打通灵动岛
-        AgentExecutionService.acquire(context, LEASE_ID) {
-            stop(context)
-        }
-
+        isTranslating.set(false)
+        activeTranslationCount.set(0)
         ScreenTranslationOverlayService.show(context)
         AndroidAgentLogger.info("$TAG_PREFIX started")
-        scheduleCapture(delayMs = 0)
+        // 初始待命状态，不自动开始翻译，等待用户手动触发
     }
 
     fun stop(context: Context) {
         if (!started.compareAndSet(true, false)) return
+        isTranslating.set(false)
         workerHandler?.removeCallbacksAndMessages(null)
         workerThread?.quitSafely()
         workerThread = null
@@ -97,42 +95,45 @@ internal object ScreenTranslationController {
         appContext = null
         translationCache.clear()
         activeTranslationCount.set(0)
-
         // 释放灵动岛与前台保活
         AgentExecutionService.release(LEASE_ID)
         AgentExecutionService.resetExecutionState()
-
         ScreenTranslationOverlayService.hide(context)
         AndroidAgentLogger.info("$TAG_PREFIX stopped")
     }
 
     fun isRunning(): Boolean = started.get()
 
+    /** 当前是否正在抓取或翻译中。 */
+    fun isTranslating(): Boolean = isTranslating.get()
+
     /** 当前是否已有活跃译文展示中。 */
     fun hasActiveTranslations(): Boolean = activeTranslationCount.get() > 0
 
-    /** 一键清空译文层并恢复待命状态。 */
+    /** 一键取消/清空译文层并恢复待命状态。 */
     fun clearAndStop(context: Context) {
+        isTranslating.set(false)
         activeTranslationCount.set(0)
+        workerHandler?.removeCallbacksAndMessages(null)
         clearOverlay()
         AgentExecutionService.release(LEASE_ID)
         AgentExecutionService.resetExecutionState()
-        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_active_hint))
+        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_btn_translate))
     }
 
-    /** 内容变化触发重采集（防抖）。 */
+    /** 内容变化触发重采集：单次模式下不自激，避免无障碍正反馈死循环。 */
     fun onScreenContentChanged() {
-        if (!started.get()) return
-        scheduleCapture()
+        // 单次按需触发设计：不自动重复捕获
     }
 
-    /** 手动刷新/单击悬浮球触发入口。 */
+    /** 手动触发单次屏幕翻译。 */
     fun requestRefresh() {
-        val context = appContext
-        if (context != null) {
-            AgentExecutionService.acquire(context, LEASE_ID) {
-                stop(context)
-            }
+        val context = appContext ?: return
+        if (isTranslating.get()) return
+        isTranslating.set(true)
+        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_translating))
+        AgentExecutionService.acquire(context, LEASE_ID) {
+            stop(context)
         }
         scheduleCapture(delayMs = 0)
     }
@@ -341,26 +342,55 @@ internal object ScreenTranslationController {
     // ------------------------------------------------------------------
     // 翻译
     // ------------------------------------------------------------------
-
     private fun translateAndRender(blocks: List<ScreenTranslationBlock>, seq: Long) {
-        val workBlocks = blocks.map { it }.toMutableList()
-
-        // 1. 缓存命中的直接复用
-        val pending = ArrayList<Pair<Int, String>>()
-        blocks.forEachIndexed { index, block ->
-            val fp = fingerprint(block.source)
-            val cached = translationCache[fp]
-            if (cached != null) {
-                workBlocks[index] = block.copy(translated = cached)
-            } else {
-                pending.add(index to fp)
+        try {
+            val workBlocks = blocks.map { it }.toMutableList()
+            // 1. 缓存命中的直接复用
+            val pending = ArrayList<Pair<Int, String>>()
+            blocks.forEachIndexed { index, block ->
+                val fp = fingerprint(block.source)
+                val cached = translationCache[fp]
+                if (cached != null) {
+                    workBlocks[index] = block.copy(translated = cached)
+                } else {
+                    pending.add(index to fp)
+                }
             }
-        }
 
-        // 2. 全部命中：直接渲染并通知灵动岛
-        if (pending.isEmpty()) {
-            activeTranslationCount.set(workBlocks.size.toLong())
-            renderOnMain(workBlocks)
+            // 2. 全部命中：直接渲染并通知灵动岛
+            if (pending.isEmpty()) {
+                activeTranslationCount.set(workBlocks.size.toLong())
+                renderOnMain(workBlocks)
+                AgentExecutionService.updateExecutionState(
+                    AgentExecutionState(
+                        phase = AgentExecutionPhase.IDLE,
+                        title = "✅ 翻译完成",
+                        detail = "已贴合 ${workBlocks.size} 处译文",
+                        showChronometer = false,
+                    ),
+                )
+                return
+            }
+
+            // 3. 分批翻译：单批不超过 MAX_BATCH_CHARS 字符
+            var batchStart = 0
+            while (batchStart < pending.size) {
+                if (!started.get()) return
+                var chars = 0
+                var batchEnd = batchStart
+                while (batchEnd < pending.size) {
+                    val nextChars = blocks[pending[batchEnd].first].source.length
+                    if (chars + nextChars > MAX_BATCH_CHARS && batchEnd > batchStart) break
+                    chars += nextChars
+                    batchEnd++
+                }
+                val batch = pending.subList(batchStart, batchEnd)
+                val ok = runTranslationBatch(blocks, batch, workBlocks)
+                if (!ok) return
+                activeTranslationCount.set(workBlocks.count { it.translated != null }.toLong())
+                renderOnMain(workBlocks)
+                batchStart = batchEnd
+            }
             AgentExecutionService.updateExecutionState(
                 AgentExecutionState(
                     phase = AgentExecutionPhase.IDLE,
@@ -369,48 +399,18 @@ internal object ScreenTranslationController {
                     showChronometer = false,
                 ),
             )
-            return
-        }
-
-        // 3. 分批翻译：单批不超过 MAX_BATCH_CHARS 字符
-        var batchStart = 0
-        while (batchStart < pending.size) {
-            if (!started.get()) return
-            var chars = 0
-            var batchEnd = batchStart
-            while (batchEnd < pending.size) {
-                val nextChars = blocks[pending[batchEnd].first].source.length
-                if (chars + nextChars > MAX_BATCH_CHARS && batchEnd > batchStart) break
-                chars += nextChars
-                batchEnd++
+            AndroidAgentLogger.debug {
+                "$TAG_PREFIX action=translate_done seq=$seq total=${blocks.size} translated=${pending.size}"
             }
-            val batch = pending.subList(batchStart, batchEnd)
-            val ok = runTranslationBatch(blocks, batch, workBlocks)
-            if (!ok) return
-
-            activeTranslationCount.set(workBlocks.count { it.translated != null }.toLong())
-            renderOnMain(workBlocks)
-            batchStart = batchEnd
-        }
-
-        AgentExecutionService.updateExecutionState(
-            AgentExecutionState(
-                phase = AgentExecutionPhase.IDLE,
-                title = "✅ 翻译完成",
-                detail = "已贴合 ${workBlocks.size} 处译文",
-                showChronometer = false,
-            ),
-        )
-
-        AndroidAgentLogger.debug {
-            "$TAG_PREFIX action=translate_done seq=$seq total=${blocks.size} translated=${pending.size}"
+        } finally {
+            isTranslating.set(false)
         }
     }
 
     private fun resolveRuntimeConfig(): AgentModelClient.ModelConfig? {
         val repoConfig = runCatching {
             runBlocking {
-                RuntimeConfigRepository.currentRuntimeConfig()
+                RuntimeConfigRepository.translationRuntimeConfig()
             }
         }.getOrNull()
         if (repoConfig != null && repoConfig.apiKey.isNotBlank()) {
@@ -660,6 +660,7 @@ internal object ScreenTranslationController {
     }
 
     private fun postOverlayError(displayMessage: String) {
+        isTranslating.set(false)
         AndroidAgentLogger.warnThrottled("screen_translation_error") {
             "Screen translation error: $displayMessage"
         }
