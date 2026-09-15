@@ -658,11 +658,10 @@ internal object ScreenTranslationController {
     }
 
     private fun unescapeJsonString(str: String): String {
-        return str.replace("\"", """)
-            .replace("\n", "
-")
-            .replace("\r", "")
-            .replace("\t", "	")
+        return str.replace("\\"", "\"")
+            .replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t")
             .replace("\\\\", "\\")
     }
 
