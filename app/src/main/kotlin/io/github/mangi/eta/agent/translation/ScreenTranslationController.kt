@@ -199,8 +199,7 @@ internal object ScreenTranslationController {
         }
         if (candidates.size <= 1) return candidates
         return mergeInline(candidates, density)
-            .sortedBy { it.boundsInScreen.top }
-            .thenBy { it.boundsInScreen.left }
+            .sortedWith(compareBy({ it.boundsInScreen.top }, { it.boundsInScreen.left }))
     }
 
     private fun pickNodeText(node: AgentAccessibilityService.UiNode): String? {

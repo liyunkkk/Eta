@@ -96,8 +96,8 @@ internal class ScreenTranslationOverlayService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.END
             title = "EtaScreenTranslationControl"
-            topMargin = (52 * density).roundToInt()
-            rightMargin = (10 * density).roundToInt()
+            x = (10 * density).roundToInt()
+            y = (52 * density).roundToInt()
         }
         runCatching { wm.addView(pill, pillParams) }
             .onFailure { throwable ->
@@ -132,7 +132,10 @@ internal class ScreenTranslationOverlayService : Service() {
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
         pill.addView(
             label,
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
         )
         val close = TextView(this)
         close.text = getString(io.github.mangi.eta.R.string.screen_translation_close)
@@ -170,9 +173,9 @@ internal class ScreenTranslationOverlayService : Service() {
         for (block in blocks) {
             val translated = block.translated ?: continue
             if (translated.isBlank()) continue
-            val left = block.boundsInScreen.left.roundToInt()
-            val top = block.boundsInScreen.top.roundToInt()
-            val width = block.boundsInScreen.width().roundToInt()
+            val left = block.boundsInScreen.left
+            val top = block.boundsInScreen.top
+            val width = block.boundsInScreen.width()
             if (width <= 0) continue
             val textView = TextView(this)
             textView.text = translated
@@ -199,18 +202,16 @@ internal class ScreenTranslationOverlayService : Service() {
         }
     }
 
-    private companion object {
-        val BLOCK_BACKGROUND_COLOR = 0xE6333333.toInt()
-        val PILL_COLOR = 0xD91C1C1E.toInt()
-    }
-
     internal companion object {
         const val ACTION_HIDE = "io.github.mangi.eta.agent.translation.HIDE"
+        private const val ACTION_SHOW = "io.github.mangi.eta.agent.translation.SHOW"
+        private val BLOCK_BACKGROUND_COLOR = 0xE6333333.toInt()
+        private val PILL_COLOR = 0xD91C1C1E.toInt()
 
         fun show(context: Context) {
             context.applicationContext.startService(
                 Intent(context.applicationContext, ScreenTranslationOverlayService::class.java)
-                    .setAction("io.github.mangi.eta.agent.translation.SHOW"),
+                    .setAction(ACTION_SHOW),
             )
         }
 
