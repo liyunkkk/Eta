@@ -653,6 +653,9 @@
   <string name="voice_screen_unavailable">無法使用目前畫面</string>
   <string name="screen_translation_start">螢幕翻譯</string>
   <string name="screen_translation_active_hint">螢幕翻譯中</string>
+  <string name="screen_translation_translating">正在翻譯…</string>
+  <string name="screen_translation_error_no_key">未設定 API Key</string>
+  <string name="screen_translation_error_failed">介面請求失敗</string>
   <string name="screen_translation_close">停止</string>
   <string name="voice_screen_preview">目前畫面預覽</string>
   <string name="voice_screen_title">目前畫面</string>

@@ -32,6 +32,7 @@ internal class ScreenTranslationOverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var translationRoot: FrameLayout? = null
     private var controlPill: LinearLayout? = null
+    private var controlLabel: TextView? = null
     private val isAttached = AtomicBoolean(false)
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -130,6 +131,7 @@ internal class ScreenTranslationOverlayService : Service() {
         label.text = getString(io.github.mangi.eta.R.string.screen_translation_active_hint)
         label.setTextColor(Color.WHITE)
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+        controlLabel = label
         pill.addView(
             label,
             LinearLayout.LayoutParams(
@@ -160,8 +162,14 @@ internal class ScreenTranslationOverlayService : Service() {
         windowManager = null
         translationRoot = null
         controlPill = null
+        controlLabel = null
         isAttached.set(false)
         ScreenTranslationController.detachOverlay(this)
+    }
+
+    /** 主线程调用：更新控制胶囊状态文字。 */
+    internal fun updateStatusText(text: String) {
+        controlLabel?.text = text
     }
 
     /** 主线程调用：按最新区块重建译文层子视图。 */
@@ -173,24 +181,32 @@ internal class ScreenTranslationOverlayService : Service() {
         for (block in blocks) {
             val translated = block.translated ?: continue
             if (translated.isBlank()) continue
+            // 跳过未发生实质改变的原文（无需重复遮盖）
+            if (translated.sameTranslationInputAs(block.source)) continue
             val left = block.boundsInScreen.left
             val top = block.boundsInScreen.top
             val width = block.boundsInScreen.width()
             if (width <= 0) continue
+
             val textView = TextView(this)
             textView.text = translated
             textView.setTextColor(Color.WHITE)
-            textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             textView.typeface = Typeface.DEFAULT_BOLD
             textView.setLineSpacing(2f, 1f)
             textView.includeFontPadding = false
             textView.setPadding(
-                (4 * density).roundToInt(),
-                (2 * density).roundToInt(),
-                (4 * density).roundToInt(),
-                (2 * density).roundToInt(),
+                (5 * density).toInt(),
+                (3 * density).toInt(),
+                (5 * density).toInt(),
+                (3 * density).toInt(),
             )
-            textView.setBackgroundColor(BLOCK_BACKGROUND_COLOR)
+            val bg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(BLOCK_BACKGROUND_COLOR)
+                cornerRadius = 4f * density
+            }
+            textView.background = bg
+
             val params = FrameLayout.LayoutParams(
                 width.coerceAtMost(root.resources.displayMetrics.widthPixels - left),
                 FrameLayout.LayoutParams.WRAP_CONTENT,

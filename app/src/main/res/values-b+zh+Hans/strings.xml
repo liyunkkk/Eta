@@ -665,6 +665,9 @@
   <string name="voice_screen_unavailable">当前屏幕不可用</string>
   <string name="screen_translation_start">屏幕翻译</string>
   <string name="screen_translation_active_hint">屏幕翻译中</string>
+  <string name="screen_translation_translating">正在翻译…</string>
+  <string name="screen_translation_error_no_key">未配置 API Key</string>
+  <string name="screen_translation_error_failed">接口请求失败</string>
   <string name="screen_translation_close">停止</string>
   <string name="voice_screen_preview">当前屏幕截图预览</string>
   <string name="voice_screen_title">当前屏幕</string>

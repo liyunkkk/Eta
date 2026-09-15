@@ -15,6 +15,8 @@ import io.github.mangi.eta.agent.model.ProviderRequestPurpose
 import io.github.mangi.eta.agent.runtime.AgentRunController
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.repository.LanguageSettingsRepository
+import io.github.mangi.eta.data.repository.RuntimeConfigRepository
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
@@ -228,10 +230,10 @@ internal object ScreenTranslationController {
     ): List<ScreenTranslationBlock> {
         if (blocks.size <= 1) return blocks
         val gap = (LINE_MERGE_GAP_DP * density).toInt()
-        val sortedByTop = blocks.sortedBy { it.boundsInScreen.top }
+        val sorted = blocks.sortedWith(compareBy({ it.boundsInScreen.top }, { it.boundsInScreen.left }))
         val rows = ArrayList<ScreenTranslationBlock>(blocks.size)
         var current: ScreenTranslationBlock? = null
-        for (block in sortedByTop) {
+        for (block in sorted) {
             val head = current
             if (head == null) {
                 current = block
@@ -239,11 +241,13 @@ internal object ScreenTranslationController {
             }
             val sameLine = abs(head.boundsInScreen.centerY() - block.boundsInScreen.centerY()) <= gap &&
                 abs(head.boundsInScreen.height() - block.boundsInScreen.height()) <= gap * 2
-            if (sameLine) {
+            val horizontalAdjacent = block.boundsInScreen.left >= head.boundsInScreen.left &&
+                (block.boundsInScreen.left - head.boundsInScreen.right) <= gap * 3
+            if (sameLine && horizontalAdjacent) {
                 current = head.copy(
                     source = head.source + " " + block.source,
                     boundsInScreen = Rect(
-                        minOf(head.boundsInScreen.left, block.boundsInScreen.left),
+                        head.boundsInScreen.left,
                         minOf(head.boundsInScreen.top, block.boundsInScreen.top),
                         maxOf(head.boundsInScreen.right, block.boundsInScreen.right),
                         maxOf(head.boundsInScreen.bottom, block.boundsInScreen.bottom),
@@ -304,6 +308,22 @@ internal object ScreenTranslationController {
         }
     }
 
+    private fun resolveRuntimeConfig(): AgentModelClient.ModelConfig? {
+        val repoConfig = runCatching {
+            runBlocking {
+                RuntimeConfigRepository.currentRuntimeConfig()
+            }
+        }.getOrNull()
+        if (repoConfig != null && repoConfig.apiKey.isNotBlank()) {
+            return repoConfig
+        }
+        val clientConfig = runCatching { AgentModelClient.loadConfig() }.getOrNull()
+        if (clientConfig != null && clientConfig.apiKey.isNotBlank()) {
+            return clientConfig
+        }
+        return repoConfig ?: clientConfig
+    }
+
     /**
      * 执行一次批量翻译：构建编号 JSON 列表 prompt，解析响应。
      * 返回 false 表示本帧放弃（服务停止/模型失败）。
@@ -314,11 +334,19 @@ internal object ScreenTranslationController {
         workBlocks: MutableList<ScreenTranslationBlock>,
     ): Boolean {
         val context = appContext ?: return false
-        val config = runCatching { AgentModelClient.loadConfig() }.getOrNull()
+        val config = resolveRuntimeConfig()
             ?: run {
-                postOverlayError("config_unavailable")
+                postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_no_key))
                 return false
             }
+        if (config.apiKey.isBlank()) {
+            AndroidAgentLogger.warnThrottled("screen_translation_no_api_key") {
+                "Screen translation failed: API key is blank for provider ${config.providerName}"
+            }
+            postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_no_key))
+            return false
+        }
+        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_translating))
         val provider = ProviderClientFactory.getClient(config)
         val controller = AgentRunController()
         val retry = AgentModelRetry()
@@ -358,12 +386,12 @@ internal object ScreenTranslationController {
             AndroidAgentLogger.warnThrottled("screen_translation_model_failed") {
                 "Screen translation model call failed: ${failure.message?.take(120)}"
             }
-            postOverlayError("model_failed")
+            postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_failed))
             return false
         }
         val content = response.assistantMessage.optString("content").trim()
         if (content.isBlank() || content == "null") {
-            postOverlayError("empty_response")
+            postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_failed))
             return false
         }
         val parsed = runCatching { parseTranslations(content) }.getOrNull()
@@ -371,7 +399,7 @@ internal object ScreenTranslationController {
             AndroidAgentLogger.warnThrottled("screen_translation_parse_failed") {
                 "Screen translation response unparseable: ${content.take(80)}"
             }
-            postOverlayError("parse_failed")
+            postOverlayError(context.getString(io.github.mangi.eta.R.string.screen_translation_error_failed))
             return false
         }
         for ((index, translation) in parsed) {
@@ -383,8 +411,9 @@ internal object ScreenTranslationController {
                 translationCache.clear()
                 translationCache[fp] = translation
             }
-            workBlocks[index] = workBlocks[index].copy(translated = translation)
+            workBlocks[index] = blocks[index].copy(translated = translation)
         }
+        updateOverlayStatus(context.getString(io.github.mangi.eta.R.string.screen_translation_active_hint))
         return true
     }
 
@@ -518,11 +547,16 @@ internal object ScreenTranslationController {
         main.post { overlayService?.renderBlocks(emptyList()) }
     }
 
-    private fun postOverlayError(reason: String) {
-        // v1：模型失败时保留上一次成功渲染的译文，只记录日志
-        AndroidAgentLogger.warnThrottled("screen_translation_error_$reason") {
-            "Screen translation overlay error: $reason"
+    private fun updateOverlayStatus(text: String) {
+        val main = mainHandler ?: return
+        main.post { overlayService?.updateStatusText(text) }
+    }
+
+    private fun postOverlayError(displayMessage: String) {
+        AndroidAgentLogger.warnThrottled("screen_translation_error") {
+            "Screen translation error: $displayMessage"
         }
+        updateOverlayStatus(displayMessage)
     }
 
     // ------------------------------------------------------------------
