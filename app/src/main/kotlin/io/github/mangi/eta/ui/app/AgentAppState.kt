@@ -989,9 +989,6 @@ internal class AgentAppState(
         val runtimePrompt = AgentFileReferencePromptCodec.format(prompt, fileReferences)
 
         val edit = homeState.messageEdit
-        if (edit == null && selectedConversationId?.isReadOnlyExternalArchiveConversation() == true) {
-            moveCurrentDraftToNewConversation()
-        }
 
         val editBoundary = edit?.let {
             AgentConversationRevisionReducer.boundary(homeState, it.targetMessageId)

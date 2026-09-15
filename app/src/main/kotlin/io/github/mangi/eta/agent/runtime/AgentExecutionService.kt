@@ -97,7 +97,7 @@ internal class AgentExecutionService : Service() {
         )
 
         val state = executionState
-        val appTitle = "✨ " + (state.subtitle ?: getString(R.string.app_name))
+        val appTitle = state.subtitle ?: getString(R.string.app_name)
         val actionText = state.title ?: getString(R.string.execution_phase_thinking)
         val detailText = state.detail ?: getString(R.string.execution_summary, leases.count())
 

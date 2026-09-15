@@ -103,6 +103,12 @@ android {
 }
 
 dependencies {
+    // Google ML Kit 离线 OCR：屏幕像素级文本检测与精准包围盒提取
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition.chinese)
+    implementation(libs.mlkit.text.recognition.japanese)
+    implementation(libs.mlkit.text.recognition.korean)
+
     implementation(libs.commons.compress)
     implementation(libs.xz)
     compileOnly(libs.libxposed.api)
