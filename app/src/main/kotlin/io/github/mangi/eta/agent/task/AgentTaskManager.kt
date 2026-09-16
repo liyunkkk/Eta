@@ -69,6 +69,8 @@ internal class AgentTaskManager private constructor(
             instance ?: synchronized(this) {
                 instance ?: AgentTaskManager(context.applicationContext).also { instance = it }
             }
+
+        fun getInstance(context: Context): AgentTaskManager = get(context)
     }
 
     /**
@@ -320,15 +322,4 @@ internal class AgentTaskManager private constructor(
         createdAt = createdAt,
         completedAt = completedAt,
     )
-
-    companion object {
-        @Volatile
-        private var instance: AgentTaskManager? = null
-
-        fun getInstance(context: Context): AgentTaskManager {
-            return instance ?: synchronized(this) {
-                instance ?: AgentTaskManager(context.applicationContext).also { instance = it }
-            }
-        }
-    }
 }

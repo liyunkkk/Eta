@@ -1,5 +1,5 @@
 package io.github.mangi.eta.agent.voice
-
+import io.github.mangi.eta.agent.task.AgentTaskManager
 import android.app.Service
 import io.github.mangi.eta.config.Prefs
 import android.app.ActivityOptions
@@ -209,7 +209,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         observeRuntimeSelection()
-        val taskManager = io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(this)
+        val taskManager = AgentTaskManager.get(this)
         scope.launch {
             taskManager.uiState.collectLatest { queueState ->
                 withContext(Dispatchers.Main) {

@@ -358,6 +358,9 @@ private fun AgentChatScaffold(
                 onRemoveFileReference = onRemoveFileReference,
                 onCancelMessageEdit = onCancelMessageEdit,
                 onOpenModelProviders = onOpenModelProviders,
+                taskQueueState = taskQueueState,
+                onSteerTask = onSteerTask,
+                onDeleteTask = onDeleteTask,
             )
         },
     ) { innerPadding ->
@@ -880,6 +883,9 @@ private fun AgentChatBottomBar(
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    taskQueueState: TaskQueueUiState = TaskQueueUiState(),
+    onSteerTask: (String) -> Unit = {},
+    onDeleteTask: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier

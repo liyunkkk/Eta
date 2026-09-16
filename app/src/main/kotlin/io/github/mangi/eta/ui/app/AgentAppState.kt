@@ -1,5 +1,5 @@
 package io.github.mangi.eta.ui.app
-
+import io.github.mangi.eta.agent.task.AgentTaskManager
 import io.github.mangi.eta.agent.model.AgentContextSnapshot
 
 import android.content.ComponentName
@@ -111,7 +111,7 @@ internal class AgentAppState(
     skillZipImportGateway: SkillZipImportGateway? = null,
 ) {
     private val appContext = context.applicationContext
-    private val taskManager = io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(appContext)
+    private val taskManager: AgentTaskManager = AgentTaskManager.get(appContext)
     private val skillZipImportGateway = skillZipImportGateway ?: CoreSkillZipImportGateway(appContext)
     private val runConversationIds = mutableMapOf<String, String>()
     private val runMessageProjector = AgentRunMessageProjector()
