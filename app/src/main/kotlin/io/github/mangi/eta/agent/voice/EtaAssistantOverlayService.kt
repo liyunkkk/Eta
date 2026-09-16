@@ -428,7 +428,6 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS,
             PixelFormat.TRANSLUCENT,
         ).apply {
@@ -570,11 +569,11 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             screenContext = EtaScreenContextStateReducer.consume(),
             pendingImages = emptyList(),
             pendingFileReferences = emptyList(),
-            messages = cleanMessages + UserMessageUi(
+            messages = (cleanMessages + UserMessageUi(
                 id = "user-$runId",
                 content = runtimePrompt,
                 images = previewImages,
-            ),
+            )).distinctBy { it.id },
         )
         updateSoftInput(visible = false)
         runJob = scope.launch {
@@ -850,7 +849,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             is AgentEvent.RoundStarted,
             -> Unit
         }
-        return state.copy(messages = messages, phase = phase, status = status)
+        return state.copy(messages = messages.distinctBy { it.id }, phase = phase, status = status)
     }
 
     private fun finishRunMessages(

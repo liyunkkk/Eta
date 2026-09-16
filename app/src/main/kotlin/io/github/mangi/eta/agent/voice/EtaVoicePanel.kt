@@ -371,10 +371,11 @@ internal fun EtaVoicePanel(
             val imeBottom = WindowInsets.ime.getBottom(density)
             val navigationBottom = WindowInsets.navigationBars.getBottom(density)
             val statusTop = WindowInsets.statusBars.getTop(density)
-            val bottomInset = max(imeBottom, navigationBottom)
+            val safeNavigationBottom = max(navigationBottom, with(density) { 16.dp.toPx() }.toInt())
+            val bottomInset = max(imeBottom, safeNavigationBottom)
             val imeOverlap = (imeBottom - navigationBottom).coerceAtLeast(0)
             val maxContentHeightPx = with(density) {
-                (maxHeight - 88.dp).toPx() - statusTop - navigationBottom
+                (maxHeight - 88.dp).toPx() - statusTop - safeNavigationBottom
             }.coerceAtLeast(with(density) { 220.dp.toPx() })
             AssistantPanel(
                 state = state,
@@ -502,14 +503,21 @@ private fun BoxScope.AssistantPanel(
         },
         label = "assistant_message_reveal",
     )
+    var isTaskDashboardExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(imeOverlapPx > 0) {
+        if (imeOverlapPx > 0 && isTaskDashboardExpanded) {
+            isTaskDashboardExpanded = false
+        }
+    }
     val currentAnimatedHeight = rememberUpdatedState(animatedHeightPx)
     val sheetHeightPx = draggedHeightPx ?: animatedHeightPx
-    val composerReservedHeightPx = with(density) { 140.dp.toPx() }
-    val maxAvailableForSheetPx = if (imeOverlapPx > 0) {
-        (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
-    } else {
-        maxContentHeightPx
+    val composerReservedHeightPx = with(density) {
+        val base = 136.dp
+        val taskExtra = if (isTaskDashboardExpanded) (if (imeOverlapPx > 0) 100.dp else 190.dp) else 0.dp
+        val historyExtra = if (state.isHistoryMenuVisible) 180.dp else 0.dp
+        (base + taskExtra + historyExtra).toPx()
     }
+    val maxAvailableForSheetPx = (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
     val visibleSheetHeightPx = sheetHeightPx.coerceAtMost(maxAvailableForSheetPx)
     val nearFullscreen = sheetHeightPx >= maxContentHeightPx * 0.88f
     val handoffReady = canOpenConversation && nearFullscreen &&
@@ -659,6 +667,7 @@ private fun BoxScope.AssistantPanel(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
+            .heightIn(max = with(density) { (maxContentHeightPx + bottomInsetPx).toDp() })
             .offset(y = with(density) { sheetTranslationPx.toDp() })
             .clip(sheetShape)
             .drawBehind {
@@ -747,6 +756,8 @@ private fun BoxScope.AssistantPanel(
             input = input,
             colors = colors,
             focusRequester = focusRequester,
+            isTaskDashboardExpanded = isTaskDashboardExpanded,
+            onToggleTaskDashboard = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
             onInputChange = onInputChange,
             onScreenContextSelect = onScreenContextSelect,
             onScreenContextRemove = onScreenContextRemove,
@@ -783,6 +794,8 @@ private fun AssistantComposer(
     input: String,
     colors: EtaVoicePanelColors,
     focusRequester: FocusRequester,
+    isTaskDashboardExpanded: Boolean,
+    onToggleTaskDashboard: () -> Unit,
     onInputChange: (String) -> Unit,
     onScreenContextSelect: () -> Unit,
     onScreenContextRemove: () -> Unit,
@@ -803,12 +816,10 @@ private fun AssistantComposer(
     onOpenModelProviders: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isTaskDashboardExpanded by remember { mutableStateOf(false) }
     var selectedTaskTab by remember { mutableStateOf(1) }
     var steeringInput by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-
     Column(
         modifier = modifier.animateContentSize(
             animationSpec = folmeSpring(damping = 0.92f, response = 0.34f),
@@ -824,7 +835,7 @@ private fun AssistantComposer(
             TaskStatusCapsuleBadge(
                 state = state.taskQueueState,
                 isExpanded = isTaskDashboardExpanded,
-                onClick = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
+                onClick = onToggleTaskDashboard,
             )
             ConversationCapsule(
                 title = state.conversationTitle.ifBlank { stringResource(R.string.voice_new_conversation_hint) },

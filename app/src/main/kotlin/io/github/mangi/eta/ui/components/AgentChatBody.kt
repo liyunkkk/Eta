@@ -611,6 +611,7 @@ internal fun AgentConversationMessages(
     // 滚动层保持整屏，输入器作为后绘制浮层；输入器高度进入列表的
     // afterContentPadding，确保跟到底部时最后一行停在输入器上方。
     Box(modifier = modifier.clipToBounds()) {
+        val safeTimelineEntries = remember(timelineEntries) { timelineEntries.distinctBy { it.key } }
         LazyColumn(
             state = scrollState,
             verticalArrangement = Arrangement.Top,
@@ -625,7 +626,7 @@ internal fun AgentConversationMessages(
             overscrollEffect = null,
         ) {
             items(
-                items = timelineEntries,
+                items = safeTimelineEntries,
                 key = { it.key },
             ) { entry ->
                 val itemModifier = Modifier.animateItem(
@@ -775,7 +776,7 @@ private sealed interface AgentTimelineEntry {
 
     data class Message(
         val message: AgentChatMessageUi,
-        override val key: String = message.id,
+        override val key: String,
     ) : AgentTimelineEntry
 
     data class WorkProcess(
@@ -823,7 +824,7 @@ private fun List<AgentChatMessageUi>.toTimelineEntries(): List<AgentTimelineEntr
         }
     }
     flushWorkProcess()
-}
+}.distinctBy { it.key }
 
 private fun AgentChatMessageUi.isWorkProcessMessage(): Boolean =
     this is ThinkingMessageUi || this is ToolActivityMessageUi || this is ToolSummaryMessageUi
