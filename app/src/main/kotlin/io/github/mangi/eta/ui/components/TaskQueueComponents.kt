@@ -449,31 +449,38 @@ fun TaskTriTabDashboard(
             }
             1 -> {
                 // 当前正在执行的任务与实时追加
-                if (state.activeTask != null) {
-                    TaskCardItem(
-                        task = state.activeTask,
-                        isCompact = false,
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "当前无正在执行的任务",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = if (isFloatingOverlay) 180.dp else 260.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    if (state.activeTask != null) {
+                        TaskCardItem(
+                            task = state.activeTask,
+                            isCompact = true,
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "当前无正在执行的任务",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TaskSteeringInputBox(
+                        value = steeringInput,
+                        onValueChange = onSteeringInputChange,
+                        onSend = onSendSteering,
+                    )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-                TaskSteeringInputBox(
-                    value = steeringInput,
-                    onValueChange = onSteeringInputChange,
-                    onSend = onSendSteering,
-                )
             }
             2 -> {
                 // 历史已完成归档

@@ -504,25 +504,27 @@ private fun BoxScope.AssistantPanel(
         label = "assistant_message_reveal",
     )
     var isTaskDashboardExpanded by remember { mutableStateOf(false) }
-    LaunchedEffect(imeOverlapPx > 0) {
+    LaunchedEffect(imeOverlapPx) {
         if (imeOverlapPx > 0) {
-            if (isTaskDashboardExpanded) isTaskDashboardExpanded = false
             if (state.isHistoryMenuVisible) onToggleHistoryMenu()
+            if (keepBottomAnchored && state.messages.isNotEmpty()) {
+                delay(60)
+                val count = listState.layoutInfo.totalItemsCount
+                if (count > 0) {
+                    listState.scrollToItem(count - 1)
+                }
+            }
         }
     }
     val currentAnimatedHeight = rememberUpdatedState(animatedHeightPx)
     val sheetHeightPx = draggedHeightPx ?: animatedHeightPx
     val composerReservedHeightPx = with(density) {
         val base = 136.dp
-        val taskExtra = if (isTaskDashboardExpanded) (if (imeOverlapPx > 0) 100.dp else 190.dp) else 0.dp
+        val taskExtra = if (isTaskDashboardExpanded) (if (imeOverlapPx > 0) 150.dp else 190.dp) else 0.dp
         val historyExtra = if (state.isHistoryMenuVisible) 180.dp else 0.dp
         (base + taskExtra + historyExtra).toPx()
     }
-    val maxAvailableForSheetPx = if (imeOverlapPx > 0) {
-        (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
-    } else {
-        maxContentHeightPx
-    }
+    val maxAvailableForSheetPx = (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
     val visibleSheetHeightPx = sheetHeightPx.coerceAtMost(maxAvailableForSheetPx)
     val nearFullscreen = sheetHeightPx >= maxContentHeightPx * 0.88f
     val handoffReady = canOpenConversation && nearFullscreen &&
