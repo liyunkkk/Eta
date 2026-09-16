@@ -86,32 +86,34 @@ fun TaskStatusCapsuleBadge(
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "任务 ${state.totalCount}",
+            text = if (state.totalCount == 0) "📋 任务队列" else "任务 ${state.totalCount}",
             style = MiuixTheme.textStyles.footnote1,
             color = MiuixTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "✓${state.completedCount}",
-            style = MiuixTheme.textStyles.footnote2,
-            color = StatusSuccess,
-        )
-        if (state.runningCount > 0) {
-            Spacer(modifier = Modifier.width(4.dp))
+        if (state.totalCount > 0) {
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "⟳${state.runningCount}",
+                text = "✓${state.completedCount}",
                 style = MiuixTheme.textStyles.footnote2,
-                color = StatusRunning,
+                color = StatusSuccess,
             )
-        }
-        if (state.failedCount > 0) {
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "⚠${state.failedCount}",
-                style = MiuixTheme.textStyles.footnote2,
-                color = StatusError,
-            )
+            if (state.runningCount > 0) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "⟳${state.runningCount}",
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = StatusRunning,
+                )
+            }
+            if (state.failedCount > 0) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "⚠${state.failedCount}",
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = StatusError,
+                )
+            }
         }
         Spacer(modifier = Modifier.width(6.dp))
         Icon(

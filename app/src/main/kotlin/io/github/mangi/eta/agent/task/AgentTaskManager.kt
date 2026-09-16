@@ -42,7 +42,7 @@ internal class AgentTaskManager private constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val database = EtaDatabase.get(context)
-    private val dao: TaskQueueDao = database.taskQueueDao()
+    val dao: TaskQueueDao = database.taskQueueDao()
     private val runtimeClient = AgentRuntimeClient(context, logger)
 
     private val _uiState = MutableStateFlow(TaskQueueUiState())

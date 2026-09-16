@@ -1,5 +1,6 @@
 package io.github.mangi.eta.ui.app
 import io.github.mangi.eta.agent.task.AgentTaskManager
+import io.github.mangi.eta.data.db.TaskQueueStatus
 import io.github.mangi.eta.agent.model.AgentContextSnapshot
 
 import android.content.ComponentName
@@ -167,7 +168,7 @@ internal class AgentAppState(
     init {
         refreshConversationSummaries()
         observeRuntimeSelection()
-        selectedConversationId?.let { taskManager.bindConversation(it) }
+        val initialId = ensureSelectedConversationId()
         scope.launch {
             taskManager.uiState.collectLatest { queueState ->
                 val currentId = selectedConversationId ?: return@collectLatest
@@ -1068,7 +1069,7 @@ internal class AgentAppState(
         },
     )
 
-    fun sendCurrentMessage(submittedText: String? = null) {
+    fun sendCurrentMessage(submittedText: String? = null, fromTaskQueue: Boolean = false) {
         if (homeState.isCompacting) return
         val prompt = (submittedText ?: homeState.input).trim()
         val pendingImages = homeState.pendingImages
@@ -1077,40 +1078,43 @@ internal class AgentAppState(
             return
         }
 
-        // 1. 运行中追加指令（Mid-run Steering）或降级排队（Auto Enqueue）
-        if (homeState.isStreaming) {
-            if (prompt.isNotBlank()) {
-                steerActiveTask(prompt)
-                updateCurrentConversation(homeState.copy(input = ""))
-            }
-            return
-        }
-
-        // 2. 显式指令前缀：/task, /queue, /q
-        val taskPrefixRegex = Regex("^/(task|queue|q)\\s+", RegexOption.IGNORE_CASE)
-        val taskPrefixMatch = taskPrefixRegex.find(prompt)
-        if (taskPrefixMatch != null) {
-            val taskContent = prompt.substring(taskPrefixMatch.range.last + 1).trim()
-            if (taskContent.isNotBlank()) {
-                enqueueTask(taskContent)
-                updateCurrentConversation(
-                    homeState.copy(
-                        input = "",
-                        pendingImages = emptyList(),
-                        pendingFileReferences = emptyList(),
-                    )
-                )
+        if (!fromTaskQueue) {
+            // 1. 运行中追加指令（Mid-run Steering）或降级排队（Auto Enqueue）
+            if (homeState.isStreaming) {
+                if (prompt.isNotBlank()) {
+                    steerActiveTask(prompt)
+                    updateCurrentConversation(homeState.copy(input = ""))
+                }
                 return
             }
-        }
 
-        // 3. 多任务清单语法自动识别（Batch Enqueue）
-        val parsedTasks = parseTaskListFromPrompt(prompt)
-        if (parsedTasks.size >= 2) {
-            val conversationId = selectedConversationId
-            if (conversationId != null) {
+            // 2. 显式指令前缀：/task, /queue, /q
+            val taskPrefixRegex = Regex("^/(task|queue|q)\\s+", RegexOption.IGNORE_CASE)
+            val taskPrefixMatch = taskPrefixRegex.find(prompt)
+            if (taskPrefixMatch != null) {
+                val taskContent = prompt.substring(taskPrefixMatch.range.last + 1).trim()
+                if (taskContent.isNotBlank()) {
+                    enqueueTask(taskContent)
+                    updateCurrentConversation(
+                        homeState.copy(
+                            input = "",
+                            pendingImages = emptyList(),
+                            pendingFileReferences = emptyList(),
+                        )
+                    )
+                    return
+                }
+            }
+
+            // 3. 多任务清单语法自动识别（Batch Enqueue）
+            val parsedTasks = parseTaskListFromPrompt(prompt)
+            if (parsedTasks.size >= 2) {
+                val conversationId = ensureSelectedConversationId()
                 scope.launch {
                     taskManager.enqueueTasks(conversationId, parsedTasks)
+                    withContext(Dispatchers.Main) {
+                        pumpTaskQueue()
+                    }
                 }
                 updateCurrentConversation(
                     homeState.copy(
@@ -1121,19 +1125,19 @@ internal class AgentAppState(
                 )
                 return
             }
-        }
 
-        // 4. 若任务队列当前已有待执行/运行任务，自动排入队尾
-        if (!taskManager.uiState.value.isIdle) {
-            enqueueTask(prompt)
-            updateCurrentConversation(
-                homeState.copy(
-                    input = "",
-                    pendingImages = emptyList(),
-                    pendingFileReferences = emptyList(),
+            // 4. 若任务队列当前已有待执行/运行任务，自动排入队尾
+            if (!taskManager.uiState.value.isIdle) {
+                enqueueTask(prompt)
+                updateCurrentConversation(
+                    homeState.copy(
+                        input = "",
+                        pendingImages = emptyList(),
+                        pendingFileReferences = emptyList(),
+                    )
                 )
-            )
-            return
+                return
+            }
         }
         homeState.messageEdit?.takeIf { it.preserveFollowingMessages }?.let { edit ->
             val updated = RoleplayConversationReducer.edit(homeState, edit.targetMessageId, prompt) ?: return
@@ -1173,9 +1177,7 @@ internal class AgentAppState(
             return
         }
 
-        val conversationId = selectedConversationId ?: newConversationId().also {
-            selectedConversationId = it
-        }
+        val conversationId = ensureSelectedConversationId()
         val runId = "run-${UUID.randomUUID()}"
         val userMessage = UserMessageUi(
             id = editBoundary?.userMessage?.id ?: "user-$runId",
@@ -2434,6 +2436,23 @@ internal class AgentAppState(
                 null
             }
         )
+        val runningTaskId = activeQueueTaskId
+        if (runningTaskId != null) {
+            activeQueueTaskId = null
+            val now = System.currentTimeMillis()
+            scope.launch(Dispatchers.IO) {
+                if (result.ok) {
+                    val summary = result.content.take(200).trim()
+                    taskManager.dao.markCompleted(runningTaskId, TaskQueueStatus.COMPLETED, summary, now)
+                } else {
+                    val err = result.error ?: "未完成"
+                    taskManager.dao.markFailed(runningTaskId, err, now)
+                }
+                withContext(Dispatchers.Main) {
+                    pumpTaskQueue()
+                }
+            }
+        }
     }
 
     private fun updateRunTrace(
@@ -2751,18 +2770,57 @@ internal class AgentAppState(
         }
     }
 
-    fun enqueueTask(taskText: String) {
+    private var activeQueueTaskId: String? = null
+
+    private fun ensureSelectedConversationId(): String {
+        val existing = selectedConversationId
+        if (existing != null) return existing
+        val newId = newConversationId()
+        selectedConversationId = newId
+        conversationPaneState = conversationPaneState.copy(selectedConversationId = newId)
+        taskManager.bindConversation(newId)
+        return newId
+    }
+
+    fun pumpTaskQueue() {
         val conversationId = selectedConversationId ?: return
+        if (homeState.isStreaming || currentRunId != null) return
+        scope.launch(Dispatchers.IO) {
+            val nextTask = taskManager.dao.getNextPendingTask(conversationId) ?: return@launch
+            taskManager.dao.updateTask(nextTask.copy(status = TaskQueueStatus.RUNNING))
+            withContext(Dispatchers.Main) {
+                if (homeState.isStreaming || currentRunId != null) {
+                    scope.launch(Dispatchers.IO) {
+                        taskManager.dao.updateTask(nextTask.copy(status = TaskQueueStatus.PENDING))
+                    }
+                    return@withContext
+                }
+                activeQueueTaskId = nextTask.taskId
+                sendCurrentMessage(nextTask.prompt, fromTaskQueue = true)
+            }
+        }
+    }
+
+    fun enqueueTask(taskText: String) {
+        val conversationId = ensureSelectedConversationId()
         scope.launch {
             taskManager.enqueueTask(conversationId = conversationId, prompt = taskText)
+            withContext(Dispatchers.Main) {
+                pumpTaskQueue()
+            }
         }
     }
+
     fun steerActiveTask(instruction: String) {
-        val conversationId = selectedConversationId ?: return
+        val conversationId = ensureSelectedConversationId()
         scope.launch {
             taskManager.steerOrEnqueue(conversationId = conversationId, text = instruction)
+            withContext(Dispatchers.Main) {
+                pumpTaskQueue()
+            }
         }
     }
+
     fun deleteTask(taskId: String) {
         scope.launch {
             taskManager.deleteTask(taskId)
