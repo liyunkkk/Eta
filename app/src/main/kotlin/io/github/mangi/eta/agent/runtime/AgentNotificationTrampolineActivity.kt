@@ -9,6 +9,8 @@ import io.github.mangi.eta.ui.MainActivity
 class AgentNotificationTrampolineActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
         try {
             val source = intent.getStringExtra(EXTRA_SOURCE)
             if (source == SOURCE_OVERLAY || EtaAssistantOverlayService.isServiceActive()) {
@@ -21,6 +23,8 @@ class AgentNotificationTrampolineActivity : Activity() {
             }
         } finally {
             finish()
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
         }
     }
 

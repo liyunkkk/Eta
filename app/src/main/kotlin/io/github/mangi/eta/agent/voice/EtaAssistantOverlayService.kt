@@ -245,6 +245,11 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             stopSelf()
             return
         }
+        hiddenForForegroundOperation = false
+        handoffInProgress = false
+        handoffExitRequested = false
+        isDismissing = false
+
         if (activeRunId != null || (windowView == null && uiState.messages.isNotEmpty())) {
             showWindow()
             return
@@ -350,6 +355,10 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
 
     private fun showWindow() {
         if (windowView != null) return
+        hiddenForForegroundOperation = false
+        handoffInProgress = false
+        handoffExitRequested = false
+        isDismissing = false
         val wm = getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
         val view = createComposeView {
             val appearance by AppearanceSettingsRepository.settingsFlow()
@@ -1072,6 +1081,10 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         entryCaptureJob?.cancel()
         entryCaptureJob = null
         screenContextAttachment = null
+        hiddenForForegroundOperation = false
+        handoffInProgress = false
+        handoffExitRequested = false
+        isDismissing = false
         if (activeRunId != null) {
             removeWindow()
         } else {
