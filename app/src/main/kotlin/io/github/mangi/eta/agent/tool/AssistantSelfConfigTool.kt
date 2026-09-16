@@ -76,7 +76,7 @@ internal class AssistantSelfConfigTool(
     }
 
     private fun handleSwitchModel(target: String): String {
-        val allProviders = ProviderRepository.allProviders()
+        val allProviders = runBlocking { ProviderRepository.allProviders() }
         val allModels = allProviders.flatMap { it.models }
 
         val matchedModel = allModels.firstOrNull { model ->
@@ -116,8 +116,7 @@ internal class AssistantSelfConfigTool(
     }
 
     private fun handleSwitchProvider(target: String): String {
-        val allProviders = ProviderRepository.allProviders()
-
+        val allProviders = runBlocking { ProviderRepository.allProviders() }
         val matchedProvider = allProviders.firstOrNull { provider ->
             provider.id.equals(target, ignoreCase = true) ||
                 provider.name.equals(target, ignoreCase = true)

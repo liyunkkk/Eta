@@ -84,7 +84,7 @@ internal object AssistantConfigSanitizer {
 
         if (config != null) {
             activeModelObj.put("model_id", config.model)
-            activeModelObj.put("temperature", config.temperature)
+            activeModelObj.put("display_name", config.modelDisplayName)
             activeModelObj.put("thinking_enabled", config.thinkingEnabled)
             activeModelObj.put("reasoning_effort", config.effectiveReasoningEffort.name)
             activeModelObj.put("endpoint_mode", config.openAiEndpointMode)
