@@ -78,6 +78,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TransformOrigin
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -212,42 +215,49 @@ internal object EtaScreenContextStateReducer {
 
 private data class EtaVoicePanelColors(
     val content: Color,
+    val contentGradientEnd: Color,
+    val borderHighlight: Color,
     val input: Color,
+    val inputBorder: Color,
     val inputPrimary: Color,
     val inputSecondary: Color,
     val inputTertiary: Color,
     val tertiary: Color,
     val scrim: Color,
 )
-
 @Composable
 private fun rememberEtaVoicePanelColors(): EtaVoicePanelColors {
     val dark = isSystemInDarkTheme()
     return remember(dark) {
         if (dark) {
             EtaVoicePanelColors(
-                content = Color(0xF52B2C2F),
-                input = Color(0xF2404040),
-                inputPrimary = Color(0xE6FFFFFF),
-                inputSecondary = Color(0x8AFFFFFF),
+                content = Color(0xD91E2024),
+                contentGradientEnd = Color(0xC4121316),
+                borderHighlight = Color(0x38FFFFFF),
+                input = Color(0x2EFFFFFF),
+                inputBorder = Color(0x24FFFFFF),
+                inputPrimary = Color(0xF0FFFFFF),
+                inputSecondary = Color(0x99FFFFFF),
                 inputTertiary = Color(0x4DFFFFFF),
-                tertiary = Color(0x66FFFFFF),
-                scrim = Color(0x52000000),
+                tertiary = Color(0x55FFFFFF),
+                scrim = Color(0x66000000),
             )
         } else {
             EtaVoicePanelColors(
-                content = Color(0xFAF7F7F9),
-                input = Color(0xF2FFFFFF),
-                inputPrimary = Color(0xE6000000),
-                inputSecondary = Color(0x8A000000),
-                inputTertiary = Color(0x42000000),
-                tertiary = Color(0x52000000),
-                scrim = Color(0x30000000),
+                content = Color(0xEBFFFFFF),
+                contentGradientEnd = Color(0xD9F0F3F8),
+                borderHighlight = Color(0xB3FFFFFF),
+                input = Color(0xB8FFFFFF),
+                inputBorder = Color(0x66FFFFFF),
+                inputPrimary = Color(0xE6111318),
+                inputSecondary = Color(0x8A2A2D35),
+                inputTertiary = Color(0x422A2D35),
+                tertiary = Color(0x38000000),
+                scrim = Color(0x38000000),
             )
         }
     }
 }
-
 @Composable
 internal fun EtaVoicePanel(
     state: EtaVoiceUiState,
@@ -322,8 +332,12 @@ internal fun EtaVoicePanel(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = entryProgress.value
-                    translationY = (1f - entryProgress.value) * with(density) { 32.dp.toPx() }
+                    alpha = entryProgress.value.coerceIn(0f, 1f)
+                    transformOrigin = TransformOrigin(0.5f, 1.0f)
+                    val scale = 0.88f + 0.12f * entryProgress.value
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = (1f - entryProgress.value) * with(density) { 56.dp.toPx() }
                 },
         ) {
             val imeBottom = WindowInsets.ime.getBottom(density)
@@ -612,7 +626,7 @@ private fun BoxScope.AssistantPanel(
 
     val bottomInset = with(density) { bottomInsetPx.toDp() }
     val messageRevealOffsetPx = with(density) { 12.dp.toPx() }
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     Column(
         modifier = Modifier
             .align(Alignment.BottomCenter)
@@ -620,10 +634,25 @@ private fun BoxScope.AssistantPanel(
             .offset(y = with(density) { sheetTranslationPx.toDp() })
             .clip(sheetShape)
             .drawBehind {
-                drawRect(
-                    colors.content.copy(
-                        alpha = colors.content.alpha * sheetBackgroundAlpha.value,
+                val glassBrush = Brush.verticalGradient(
+                    colors = listOf(
+                        colors.content.copy(alpha = colors.content.alpha * sheetBackgroundAlpha.value),
+                        colors.contentGradientEnd.copy(alpha = colors.contentGradientEnd.alpha * sheetBackgroundAlpha.value),
                     ),
+                )
+                drawRect(brush = glassBrush)
+                val specularBrush = Brush.verticalGradient(
+                    colors = listOf(
+                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * sheetBackgroundAlpha.value),
+                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * 0.25f * sheetBackgroundAlpha.value),
+                        Color.Transparent,
+                    ),
+                    startY = 0f,
+                    endY = 64.dp.toPx(),
+                )
+                drawRect(
+                    brush = specularBrush,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
                 )
             },
     ) {
@@ -855,7 +884,12 @@ private fun ScreenContextAttachment(
                     modifier = Modifier
                         .height(34.dp)
                         .squircleSurface(
-                            color = colors.input.copy(alpha = 0.9f),
+                            color = colors.input.copy(alpha = 0.82f),
+                            cornerRadius = 17.dp,
+                        )
+                        .squircleBorder(
+                            width = 0.6.dp,
+                            color = colors.inputBorder,
                             cornerRadius = 17.dp,
                         )
                         .clickable(enabled = available, onClick = onSelect)
@@ -910,7 +944,15 @@ private fun SelectedScreenContext(
     Row(
         modifier = Modifier
             .height(60.dp)
-            .squircleBackground(colors.input.copy(alpha = 0.92f), 15.dp)
+            .squircleSurface(
+                color = colors.input.copy(alpha = 0.85f),
+                cornerRadius = 15.dp,
+            )
+            .squircleBorder(
+                width = 0.6.dp,
+                color = colors.inputBorder,
+                cornerRadius = 15.dp,
+            )
             .padding(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -962,12 +1004,12 @@ private fun DragHandle(colors: EtaVoicePanelColors, modifier: Modifier = Modifie
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(34.dp),
+            .height(32.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
-                .size(width = 36.dp, height = 4.dp)
+                .size(width = 42.dp, height = 4.5.dp)
                 .clip(CircleShape)
                 .background(colors.tertiary),
         )
@@ -1008,7 +1050,12 @@ private fun ConversationCapsule(
         modifier = Modifier
             .height(34.dp)
             .squircleSurface(
-                color = colors.input.copy(alpha = 0.9f),
+                color = colors.input.copy(alpha = 0.82f),
+                cornerRadius = 17.dp,
+            )
+            .squircleBorder(
+                width = 0.6.dp,
+                color = colors.inputBorder,
                 cornerRadius = 17.dp,
             )
             .clickable(enabled = enabled, onClick = onClick)
@@ -1050,7 +1097,12 @@ private fun NewConversationCapsule(
         modifier = Modifier
             .height(34.dp)
             .squircleSurface(
-                color = colors.input.copy(alpha = 0.9f),
+                color = colors.input.copy(alpha = 0.82f),
+                cornerRadius = 17.dp,
+            )
+            .squircleBorder(
+                width = 0.6.dp,
+                color = colors.inputBorder,
                 cornerRadius = 17.dp,
             )
             .clickable(enabled = enabled, onClick = onClick)
@@ -1076,7 +1128,12 @@ private fun ScreenTranslationCapsule(
         modifier = Modifier
             .height(34.dp)
             .squircleSurface(
-                color = colors.input.copy(alpha = 0.9f),
+                color = colors.input.copy(alpha = 0.82f),
+                cornerRadius = 17.dp,
+            )
+            .squircleBorder(
+                width = 0.6.dp,
+                color = colors.inputBorder,
                 cornerRadius = 17.dp,
             )
             .clickable(enabled = enabled, onClick = onClick)

@@ -170,6 +170,16 @@ internal interface ConversationDao : ChunkedTextDao {
     suspend fun deleteMessages()
     @Query("DELETE FROM conversation_messages WHERE conversation_id = :conversationId")
     suspend fun deleteMessagesForConversation(conversationId: String)
+    @Query("DELETE FROM conversations WHERE id = :conversationId")
+    suspend fun deleteConversationRow(conversationId: String)
+    @Query("DELETE FROM conversation_context_checkpoints WHERE conversation_id = :conversationId")
+    suspend fun deleteContextCheckpoint(conversationId: String)
+    @Transaction
+    suspend fun deleteSingleConversation(conversationId: String) {
+        deleteMessagesForConversation(conversationId)
+        deleteContextCheckpoint(conversationId)
+        deleteConversationRow(conversationId)
+    }
 
     @Query("DELETE FROM conversation_context_checkpoints")
     suspend fun deleteContextCheckpoints()

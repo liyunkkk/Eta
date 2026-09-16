@@ -1,6 +1,7 @@
 package io.github.mangi.eta.agent.voice
 
 import android.app.Service
+import io.github.mangi.eta.config.Prefs
 import android.app.ActivityOptions
 import android.app.PendingIntent
 import android.content.ContentResolver
@@ -348,7 +349,8 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                             onSubmit = ::submitPrompt,
                             onStop = ::stopCurrentRun,
                             onClose = ::dismissAndStop,
-                            canOpenConversation = activeRunId == null &&
+                            canOpenConversation = !Prefs.isEnabled(Prefs.Keys.AGENT_OVERLAY_PURE_MODE) &&
+                                activeRunId == null &&
                                 (uiState.messages.any { message ->
                                     message is AgentMessageUi && message.content.isNotBlank()
                                 } || currentConversationId != null),
@@ -391,7 +393,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             title = "EtaAssistantOverlay"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && wm.isCrossWindowBlurEnabled) {
                 flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-                blurBehindRadius = 24
+                blurBehindRadius = 48
             }
         }
         runCatching { wm.addView(view, params) }.onFailure { throwable ->

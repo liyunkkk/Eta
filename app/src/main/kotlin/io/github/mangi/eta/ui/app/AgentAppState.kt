@@ -169,6 +169,11 @@ internal class AgentAppState(
         scope.launch {
             RootAccess.state.collectLatest { refreshPermissionHealth() }
         }
+        scope.launch {
+            AgentConversationStore.conversationUpdates.collect { updatedId ->
+                syncConversationFromStore(updatedId)
+            }
+        }
         runtimeRecoveryInProgress.set(true)
         scope.launch(Dispatchers.IO) {
             try {
@@ -695,6 +700,31 @@ internal class AgentAppState(
         }
     }
 
+    private fun syncConversationFromStore(conversationId: String) {
+        scope.launch(Dispatchers.IO) {
+            val loaded = AgentConversationStore.loadAssistantConversation(appContext, conversationId) ?: return@launch
+            withContext(Dispatchers.Main.immediate) {
+                val existing = conversationsById[conversationId]
+                val updatedState = (existing ?: emptyChatState(defaultThinkingEnabled)).copy(
+                    messages = loaded.messages,
+                    history = loaded.history,
+                    journal = loaded.history,
+                    thinkingEnabled = defaultThinkingEnabled,
+                    reasoningEffort = ReasoningEffort.fromLegacy(defaultThinkingEnabled),
+                )
+                conversationsById = conversationsById + (conversationId to updatedState)
+                if (loaded.title.isNotBlank()) {
+                    conversationTitles = conversationTitles + (conversationId to loaded.title)
+                }
+                conversationUpdatedAt = conversationUpdatedAt + (conversationId to System.currentTimeMillis())
+                if (selectedConversationId == conversationId) {
+                    homeState = updatedState
+                }
+                refreshConversationSummaries()
+            }
+        }
+    }
+
     suspend fun openAssistantConversation(conversationKey: String): Boolean {
         if (conversationKey.isBlank()) return false
         importArchivedExternalRuns()
@@ -703,23 +733,23 @@ internal class AgentAppState(
                 source = AgentRuntimeWire.ETA_VOICE_HANDOFF_SOURCE,
                 conversationKey = conversationKey,
             )
-            if (conversationsById[conversationId] == null) {
-                val loaded = withContext(Dispatchers.IO) {
-                    AgentConversationStore.loadAssistantConversation(appContext, conversationId)
+            val loaded = withContext(Dispatchers.IO) {
+                AgentConversationStore.loadAssistantConversation(appContext, conversationId)
+            }
+            if (loaded != null) {
+                val existing = conversationsById[conversationId]
+                conversationsById = conversationsById + (conversationId to (existing ?: emptyChatState(defaultThinkingEnabled)).copy(
+                    messages = loaded.messages,
+                    history = loaded.history,
+                    journal = loaded.history,
+                    thinkingEnabled = defaultThinkingEnabled,
+                    reasoningEffort = ReasoningEffort.fromLegacy(defaultThinkingEnabled),
+                ))
+                if (loaded.title.isNotBlank()) {
+                    conversationTitles = conversationTitles + (conversationId to loaded.title)
                 }
-                if (loaded != null) {
-                    conversationsById = conversationsById + (conversationId to emptyChatState(defaultThinkingEnabled).copy(
-                        messages = loaded.messages,
-                        history = loaded.history,
-                        journal = loaded.history,
-                        thinkingEnabled = defaultThinkingEnabled,
-                        reasoningEffort = ReasoningEffort.fromLegacy(defaultThinkingEnabled),
-                    ))
-                    if (loaded.title.isNotBlank()) {
-                        conversationTitles = conversationTitles + (conversationId to loaded.title)
-                    }
-                    refreshConversationSummaries()
-                }
+                conversationUpdatedAt = conversationUpdatedAt + (conversationId to System.currentTimeMillis())
+                refreshConversationSummaries()
             }
             if (conversationsById[conversationId] == null) {
                 false

@@ -28,6 +28,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
@@ -46,6 +50,16 @@ internal object AgentConversationStore {
     )
 
     private val saveMutex = Mutex()
+    private val _conversationUpdates = MutableSharedFlow<String>(
+        replay = 0,
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val conversationUpdates: SharedFlow<String> = _conversationUpdates.asSharedFlow()
+
+    fun notifyConversationUpdated(conversationId: String) {
+        _conversationUpdates.tryEmit(conversationId)
+    }
 
     fun load(context: Context): Snapshot =
         runBlocking(Dispatchers.IO) {
@@ -96,16 +110,34 @@ internal object AgentConversationStore {
                         journalJson = AgentConversationCodec.encodeTranscriptForStorage(state.journal.ifEmpty { state.history }),
                     )
                 }
-                EtaDatabase.get(appContext)
-                    .conversationDao()
-                    .replaceAll(
-                        conversations = conversations,
-                        messages = messages,
-                        contextCheckpoints = contextCheckpoints,
-                        state = selected?.let { ConversationStateEntity(selectedConversationId = it) },
-                    )
+                val dao = EtaDatabase.get(appContext).conversationDao()
+                dao.insertConversations(conversations)
+                dao.insertContextCheckpoints(contextCheckpoints)
+                conversationsById.forEach { (convId, state) ->
+                    dao.deleteMessagesForConversation(convId)
+                    val messageEntities = state.messages
+                        .distinctBy { it.id }
+                        .mapIndexedNotNull { index, message ->
+                            message.toEntityOrNull(convId, index)
+                        }
+                    dao.insertMessages(messageEntities)
+                }
+                if (selected != null) {
+                    dao.insertState(ConversationStateEntity(selectedConversationId = selected))
+                }
             }
         }
+        selected?.let { notifyConversationUpdated(it) }
+    }
+
+    suspend fun deleteConversation(context: Context, conversationId: String) {
+        val appContext = context.applicationContext
+        saveMutex.withLock {
+            withContext(Dispatchers.IO) {
+                EtaDatabase.get(appContext).conversationDao().deleteSingleConversation(conversationId)
+            }
+        }
+        notifyConversationUpdated(conversationId)
     }
 
     private suspend fun loadSnapshot(context: Context): Snapshot {
@@ -442,6 +474,7 @@ internal object AgentConversationStore {
                 dao.insertState(ConversationStateEntity(selectedConversationId = conversationId))
             }
         }
+        notifyConversationUpdated(conversationId)
     }
 
 
