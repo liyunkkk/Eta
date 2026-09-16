@@ -124,10 +124,10 @@ internal object AgentConversationStore {
                 }
                 if (selected != null) {
                     dao.insertState(ConversationStateEntity(selectedConversationId = selected))
+                    notifyConversationUpdated(selected)
                 }
             }
         }
-        selected?.let { notifyConversationUpdated(it) }
     }
 
     suspend fun deleteConversation(context: Context, conversationId: String) {
