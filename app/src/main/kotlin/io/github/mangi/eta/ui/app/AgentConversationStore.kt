@@ -111,6 +111,15 @@ internal object AgentConversationStore {
                     )
                 }
                 val dao = EtaDatabase.get(appContext).conversationDao()
+                if (conversationsById.isEmpty()) {
+                    dao.replaceAll(
+                        conversations = emptyList(),
+                        messages = emptyList(),
+                        contextCheckpoints = emptyList(),
+                        state = null,
+                    )
+                    return@withContext
+                }
                 dao.insertConversations(conversations)
                 dao.insertContextCheckpoints(contextCheckpoints)
                 conversationsById.forEach { (convId, state) ->
