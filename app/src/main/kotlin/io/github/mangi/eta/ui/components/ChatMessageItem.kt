@@ -366,15 +366,8 @@ internal fun AgentWorkProcess(
     } as? ToolActivityMessageUi
     val runningToolTitle = runningTool?.argumentsSummary?.takeIf { it.isNotBlank() }
         ?: runningTool?.let { toolDisplayName(it.toolName) }
-    var expanded by rememberSaveable(id) { mutableStateOf(running) }
+    var expanded by rememberSaveable(id) { mutableStateOf(false) }
     var manuallyExpanded by rememberSaveable(id) { mutableStateOf(false) }
-
-    LaunchedEffect(running) {
-        if (running && !manuallyExpanded) {
-            expanded = true
-        }
-    }
-
     val pulseAlpha = rememberActivePulse(active = running, label = "work_pulse")
 
     Column(
@@ -2140,9 +2133,6 @@ private fun ThinkingRow(
     }
     val completedMarkdownState = (streamingState ?: retainedStreamingState)
         ?.snapshot?.completedStateFor(message.content)
-    LaunchedEffect(message.isStreaming) {
-        if (message.isStreaming && !manuallyExpanded) expanded = true
-    }
 
     // Markdown 状态在行级提前创建：行进入组合（工作过程展开或滚动到可视区）时就开始
     // 后台解析，而不是等到首次点击展开。否则首帧只能测量 loading fallback 的纯文本高度，

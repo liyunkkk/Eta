@@ -651,6 +651,12 @@ internal fun AgentConversationMessages(
                                     streamingMarkdownStates.getOrPut(agentMessage.id) {
                                         StreamingMarkdownState()
                                     }
+                                } ?: (message as? ThinkingMessageUi)
+                                ?.takeIf { it.isStreaming || streamingMarkdownStates.containsKey(it.id) }
+                                ?.let { thinkingMessage ->
+                                    streamingMarkdownStates.getOrPut(thinkingMessage.id) {
+                                        StreamingMarkdownState()
+                                    }
                                 },
                             onSuggestionClick = onSuggestionClick,
                             onRunTraceClick = onRunTraceClick,
@@ -807,6 +813,15 @@ private fun List<AgentChatMessageUi>.toTimelineEntries(): List<AgentTimelineEntr
 
     fun flushWorkProcess() {
         if (workMessages.isEmpty()) return
+        val hasTools = workMessages.any { it is ToolActivityMessageUi || it is ToolSummaryMessageUi }
+        if (!hasTools) {
+            workMessages.forEach { message ->
+                val uniqueKey = ensureUniqueKey(message.id)
+                add(AgentTimelineEntry.Message(message = message, key = uniqueKey))
+            }
+            workMessages.clear()
+            return
+        }
         val rawKey = "work-${workMessages.first().id}"
         val uniqueKey = ensureUniqueKey(rawKey)
         add(

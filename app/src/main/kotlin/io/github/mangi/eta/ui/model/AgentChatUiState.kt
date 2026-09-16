@@ -105,7 +105,7 @@ data class ThinkingMessageUi(
     val content: String,
     val isStreaming: Boolean,
     val elapsedSeconds: Int? = null,
-    val collapsed: Boolean = false,
+    val collapsed: Boolean = true,
 ) : AgentChatMessageUi
 
 /**
