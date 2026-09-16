@@ -338,6 +338,9 @@ fun AgentAppRoot(
                                 AgentHomeAction.OpenModelProviders -> pushRoute(AppRoute.ModelProviders)
                                 AgentHomeAction.OpenBrowser -> pushRoute(AppRoute.Browser)
                                 AgentHomeAction.ExpandRunTrace -> Unit
+                                is AgentHomeAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
+                                is AgentHomeAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)
+                                is AgentHomeAction.DeleteTask -> agentState.deleteTask(action.taskId)
                             }
                         },
                         isDrawerOpen = conversationPaneOpen,
@@ -384,6 +387,9 @@ fun AgentAppRoot(
                                     }
                                 }
                                 is AgentChatAction.SelectReplyCandidate -> agentState.selectReplyCandidate(action.id, action.index)
+                                is AgentChatAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
+                                is AgentChatAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)
+                                is AgentChatAction.DeleteTask -> agentState.deleteTask(action.taskId)
                             }
                         },
                     )

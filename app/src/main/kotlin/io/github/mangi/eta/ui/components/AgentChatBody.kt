@@ -1,5 +1,5 @@
 package io.github.mangi.eta.ui.components
-
+import io.github.mangi.eta.ui.model.TaskQueueUiState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -153,6 +153,9 @@ internal fun AgentChatBody(
     onRunTraceClick: () -> Unit,
     onOpenBrowser: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    taskQueueState: TaskQueueUiState = TaskQueueUiState(),
+    onSteerTask: (String) -> Unit = {},
+    onDeleteTask: (String) -> Unit = {},
     characterName: String? = null,
     isDrawerOpen: Boolean = false,
     modifier: Modifier = Modifier,
@@ -255,6 +258,9 @@ internal fun AgentChatBody(
         onRunTraceClick = onRunTraceClick,
         onOpenBrowser = onOpenBrowser,
         onOpenModelProviders = onOpenModelProviders,
+        taskQueueState = taskQueueState,
+        onSteerTask = onSteerTask,
+        onDeleteTask = onDeleteTask,
         currentBrowserMessageId = currentBrowserMessageId,
         modifier = modifier,
     )
@@ -301,6 +307,9 @@ private fun AgentChatScaffold(
     onRunTraceClick: () -> Unit,
     onOpenBrowser: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    taskQueueState: TaskQueueUiState = TaskQueueUiState(),
+    onSteerTask: (String) -> Unit = {},
+    onDeleteTask: (String) -> Unit = {},
     currentBrowserMessageId: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -930,6 +939,47 @@ private fun AgentChatBottomBar(
                 .navigationBarsPadding()
                 .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
         ) {
+            var isTaskDashboardExpanded by remember { mutableStateOf(false) }
+            var selectedTaskTab by remember { mutableStateOf(1) }
+            var steeringInput by remember { mutableStateOf("") }
+
+            if (taskQueueState.hasTasks) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TaskStatusCapsuleBadge(
+                        state = taskQueueState,
+                        isExpanded = isTaskDashboardExpanded,
+                        onClick = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = isTaskDashboardExpanded,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                ) {
+                    TaskTriTabDashboard(
+                        state = taskQueueState,
+                        selectedTab = selectedTaskTab,
+                        onTabSelected = { selectedTaskTab = it },
+                        steeringInput = steeringInput,
+                        onSteeringInputChange = { steeringInput = it },
+                        onSendSteering = {
+                            if (steeringInput.isNotBlank()) {
+                                onSteerTask(steeringInput)
+                                steeringInput = ""
+                            }
+                        },
+                        onDeleteTask = onDeleteTask,
+                        isFloatingOverlay = false,
+                    )
+                }
+            }
+
             AgentChatInputBar(
                 input = input,
                 modelPickerState = modelPickerState,

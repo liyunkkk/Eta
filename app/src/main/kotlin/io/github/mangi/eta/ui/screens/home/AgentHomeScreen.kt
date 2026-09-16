@@ -60,6 +60,9 @@ internal fun AgentHomeScreen(
             onRunTraceClick = { onAction(AgentHomeAction.ExpandRunTrace) },
             onOpenBrowser = { onAction(AgentHomeAction.OpenBrowser) },
             onOpenModelProviders = { onAction(AgentHomeAction.OpenModelProviders) },
+            taskQueueState = state.taskQueueState,
+            onSteerTask = { onAction(AgentHomeAction.SteerActiveTask(it)) },
+            onDeleteTask = { onAction(AgentHomeAction.DeleteTask(it)) },
             isDrawerOpen = isDrawerOpen,
             modifier = modifier,
         )

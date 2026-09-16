@@ -1,5 +1,11 @@
 package io.github.mangi.eta.agent.voice
 
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import io.github.mangi.eta.agent.task.AgentTaskManager
+import io.github.mangi.eta.ui.components.TaskStatusCapsuleBadge
+import io.github.mangi.eta.ui.components.TaskTriTabDashboard
+import io.github.mangi.eta.ui.model.TaskQueueUiState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
@@ -160,6 +166,7 @@ internal data class EtaVoiceUiState(
     val pendingImages: List<PendingImageUi> = emptyList(),
     val pendingFileReferences: List<PendingFileReferenceUi> = emptyList(),
     val isCompacting: Boolean = false,
+    val taskQueueState: io.github.mangi.eta.ui.model.TaskQueueUiState = io.github.mangi.eta.ui.model.TaskQueueUiState(),
 ) {
     val contextUsage: AgentContextUsageUi
         get() = latestContextUsage(messages, modelPickerState.selectedModel)
@@ -796,6 +803,12 @@ private fun AssistantComposer(
     onOpenModelProviders: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var isTaskDashboardExpanded by remember { mutableStateOf(false) }
+    var selectedTaskTab by remember { mutableStateOf(1) }
+    var steeringInput by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     Column(
         modifier = modifier.animateContentSize(
             animationSpec = folmeSpring(damping = 0.92f, response = 0.34f),
@@ -808,6 +821,11 @@ private fun AssistantComposer(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TaskStatusCapsuleBadge(
+                state = state.taskQueueState,
+                isExpanded = isTaskDashboardExpanded,
+                onClick = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
+            )
             ConversationCapsule(
                 title = state.conversationTitle.ifBlank { stringResource(R.string.voice_new_conversation_hint) },
                 isMenuVisible = state.isHistoryMenuVisible,
@@ -831,6 +849,30 @@ private fun AssistantComposer(
                 enabled = state.phase != EtaVoicePhase.PROCESSING,
                 colors = colors,
                 onClick = onScreenTranslation,
+            )
+        }
+        AnimatedVisibility(
+            visible = isTaskDashboardExpanded,
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        ) {
+            TaskTriTabDashboard(
+                state = state.taskQueueState,
+                selectedTab = selectedTaskTab,
+                onTabSelected = { selectedTaskTab = it },
+                steeringInput = steeringInput,
+                onSteeringInputChange = { steeringInput = it },
+                onSendSteering = {
+                    if (steeringInput.isNotBlank()) {
+                        onSubmit(steeringInput)
+                        steeringInput = ""
+                    }
+                },
+                onDeleteTask = { taskId ->
+                    scope.launch {
+                        AgentTaskManager.getInstance(context).deleteTask(taskId)
+                    }
+                },
+                isFloatingOverlay = true,
             )
         }
         Spacer(Modifier.height(7.dp))

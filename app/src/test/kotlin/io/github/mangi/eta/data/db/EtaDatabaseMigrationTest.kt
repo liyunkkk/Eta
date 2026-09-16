@@ -11,6 +11,7 @@ import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,7 +22,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class EtaDatabaseMigrationTest {
     @Test
-    fun migration6To21PreservesDataAndMovesCompleteConversationContext() {
+    fun migration6To22PreservesDataAndMovesCompleteConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
@@ -54,6 +55,7 @@ class EtaDatabaseMigrationTest {
                 EtaDatabase.MIGRATION_18_19,
                 EtaDatabase.MIGRATION_19_20,
                 EtaDatabase.MIGRATION_20_21,
+                EtaDatabase.MIGRATION_21_22,
             )
             .build()
         try {
@@ -129,6 +131,22 @@ class EtaDatabaseMigrationTest {
                 listOf(ModelSource.CATALOG, ModelSource.MANUAL),
                 provider.models.map { it.source },
             )
+            runBlocking(Dispatchers.IO) {
+                val testTask = TaskQueueEntity(
+                    taskId = "task-test-1",
+                    conversationId = "conv-1",
+                    title = "测试任务",
+                    prompt = "测试指令",
+                    orderIndex = 0,
+                    status = TaskQueueStatus.PENDING,
+                    createdAt = 1000L,
+                )
+                database.taskQueueDao().insertTask(testTask)
+                val fetched = database.taskQueueDao().getTask("task-test-1")
+                assertNotNull(fetched)
+                assertEquals("测试任务", fetched?.title)
+                assertEquals(TaskQueueStatus.PENDING, fetched?.status)
+            }
         } finally {
             database.close()
             context.deleteDatabase(databaseName)

@@ -34,7 +34,6 @@ fun RunStatusUi.label(): String = stringResource(when (this) {
 })
 
 // ── PermissionStatusUi 映射 ───────────────────────────────────────────
-
 @Composable
 fun PermissionStatusUi.color(): Color = when (this) {
     PermissionStatusUi.Available -> StatusIdle
@@ -42,7 +41,6 @@ fun PermissionStatusUi.color(): Color = when (this) {
     PermissionStatusUi.Missing -> StatusError
     PermissionStatusUi.Disabled -> StatusIdle
 }
-
 @Composable
 fun PermissionStatusUi.label(): String = stringResource(when (this) {
     PermissionStatusUi.Available -> R.string.status_ready
@@ -50,3 +48,20 @@ fun PermissionStatusUi.label(): String = stringResource(when (this) {
     PermissionStatusUi.Missing -> R.string.status_unauthorized
     PermissionStatusUi.Disabled -> R.string.status_disabled
 })
+// ── TaskStatusUi 映射 (Miuix 统一设计语言) ─────────────────────────────
+@Composable
+fun io.github.mangi.eta.ui.model.TaskStatusUi.color(): Color = when (this) {
+    io.github.mangi.eta.ui.model.TaskStatusUi.Pending -> StatusIdle
+    io.github.mangi.eta.ui.model.TaskStatusUi.Running -> StatusRunning
+    io.github.mangi.eta.ui.model.TaskStatusUi.Completed -> StatusSuccess
+    io.github.mangi.eta.ui.model.TaskStatusUi.Failed -> StatusError
+    io.github.mangi.eta.ui.model.TaskStatusUi.Skipped -> StatusWarning
+}
+@Composable
+fun io.github.mangi.eta.ui.model.TaskStatusUi.label(): String = when (this) {
+    io.github.mangi.eta.ui.model.TaskStatusUi.Pending -> "待执行"
+    io.github.mangi.eta.ui.model.TaskStatusUi.Running -> "进行中"
+    io.github.mangi.eta.ui.model.TaskStatusUi.Completed -> "已完成"
+    io.github.mangi.eta.ui.model.TaskStatusUi.Failed -> "失败"
+    io.github.mangi.eta.ui.model.TaskStatusUi.Skipped -> "已跳过"
+}

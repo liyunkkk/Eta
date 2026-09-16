@@ -209,6 +209,14 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         observeRuntimeSelection()
+        val taskManager = io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(this)
+        scope.launch {
+            taskManager.uiState.collectLatest { queueState ->
+                withContext(Dispatchers.Main) {
+                    uiState = uiState.copy(taskQueueState = queueState)
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -1164,6 +1172,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         withContext(Dispatchers.Main.immediate) {
             if (convData != null) {
                 currentConversationId = convData.conversationId
+                io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(this@EtaAssistantOverlayService).bindConversation(convData.conversationId)
                 conversationHistory = convData.history
                 val items = recent.map { meta ->
                     AssistantConversationItem(
@@ -1236,6 +1245,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             withContext(Dispatchers.Main.immediate) {
                 if (data != null) {
                     currentConversationId = data.conversationId
+                    io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(this@EtaAssistantOverlayService).bindConversation(data.conversationId)
                     conversationHistory = data.history
                     val items = recent.map { meta ->
                         AssistantConversationItem(

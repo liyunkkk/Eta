@@ -25,8 +25,9 @@ import androidx.room.migration.Migration
         McpServerEntity::class,
         CharacterEntity::class,
         UserPersonaEntity::class,
+        TaskQueueEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = false,
 )
 internal abstract class EtaDatabase : RoomDatabase() {
@@ -36,11 +37,11 @@ internal abstract class EtaDatabase : RoomDatabase() {
     abstract fun skillDao(): SkillDao
     abstract fun mcpServerDao(): McpServerDao
     abstract fun characterDao(): CharacterDao
+    abstract fun taskQueueDao(): TaskQueueDao
 
     companion object {
         @Volatile
         private var instance: EtaDatabase? = null
-
         fun get(context: Context): EtaDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -64,6 +65,7 @@ internal abstract class EtaDatabase : RoomDatabase() {
                         MIGRATION_18_19,
                         MIGRATION_19_20,
                         MIGRATION_20_21,
+                        MIGRATION_21_22,
                     )
                     .addCallback(object : Callback() {
                         override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) { createTextChunkCleanup(db) }
@@ -94,6 +96,23 @@ internal abstract class EtaDatabase : RoomDatabase() {
             createTextChunkCleanup(database)
         }
 
+        internal val MIGRATION_21_22 = Migration(21, 22) { database ->
+            database.execSQL(
+                "CREATE TABLE IF NOT EXISTS agent_task_queue (" +
+                    "task_id TEXT NOT NULL PRIMARY KEY, " +
+                    "conversation_id TEXT NOT NULL, " +
+                    "title TEXT NOT NULL, " +
+                    "prompt TEXT NOT NULL, " +
+                    "order_index INTEGER NOT NULL, " +
+                    "status TEXT NOT NULL, " +
+                    "fail_reason TEXT, " +
+                    "output_summary TEXT, " +
+                    "created_at INTEGER NOT NULL, " +
+                    "completed_at INTEGER)"
+            )
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_agent_task_queue_conversation_id_order_index ON agent_task_queue(conversation_id, order_index)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS index_agent_task_queue_status ON agent_task_queue(status)")
+        }
         internal val MIGRATION_20_21 = Migration(20, 21) { database ->
             database.execSQL("ALTER TABLE conversations ADD COLUMN roleplay_json TEXT NOT NULL DEFAULT ''")
             database.execSQL("ALTER TABLE conversations ADD COLUMN revisions_json TEXT NOT NULL DEFAULT ''")

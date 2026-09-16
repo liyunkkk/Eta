@@ -111,6 +111,7 @@ internal class AgentAppState(
     skillZipImportGateway: SkillZipImportGateway? = null,
 ) {
     private val appContext = context.applicationContext
+    private val taskManager = io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(appContext)
     private val skillZipImportGateway = skillZipImportGateway ?: CoreSkillZipImportGateway(appContext)
     private val runConversationIds = mutableMapOf<String, String>()
     private val runMessageProjector = AgentRunMessageProjector()
@@ -166,6 +167,18 @@ internal class AgentAppState(
     init {
         refreshConversationSummaries()
         observeRuntimeSelection()
+        selectedConversationId?.let { taskManager.bindConversation(it) }
+        scope.launch {
+            taskManager.uiState.collectLatest { queueState ->
+                val currentId = selectedConversationId ?: return@collectLatest
+                val currentState = conversationsById[currentId] ?: homeState
+                val updated = currentState.copy(taskQueueState = queueState)
+                conversationsById = conversationsById + (currentId to updated)
+                if (selectedConversationId == currentId) {
+                    homeState = updated
+                }
+            }
+        }
         scope.launch {
             RootAccess.state.collectLatest { refreshPermissionHealth() }
         }
@@ -919,6 +932,7 @@ internal class AgentAppState(
     fun selectConversation(conversationId: String) {
         if (homeState.messageEdit != null) cancelMessageEdit()
         val state = conversationsById[conversationId] ?: return
+        taskManager.bindConversation(conversationId)
         fileAttachmentOwnerVersion += 1
         selectedConversationId = conversationId
         val normalized = currentReasoningCapabilities?.normalize(state.reasoningEffort)
@@ -2678,6 +2692,26 @@ internal class AgentAppState(
                     false
                 }
             }.also { persistenceJob = it }
+        }
+    }
+
+    fun enqueueTask(taskText: String) {
+        val conversationId = selectedConversationId ?: return
+        scope.launch {
+            taskManager.enqueueTask(conversationId = conversationId, prompt = taskText)
+        }
+    }
+
+    fun steerActiveTask(instruction: String) {
+        val conversationId = selectedConversationId ?: return
+        scope.launch {
+            taskManager.steerOrEnqueue(conversationId = conversationId, instruction = instruction)
+        }
+    }
+
+    fun deleteTask(taskId: String) {
+        scope.launch {
+            taskManager.deleteTask(taskId)
         }
     }
 

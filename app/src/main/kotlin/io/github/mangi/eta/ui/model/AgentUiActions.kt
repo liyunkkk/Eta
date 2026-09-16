@@ -27,6 +27,9 @@ sealed interface AgentHomeAction {
     data object OpenModelProviders : AgentHomeAction
     data object OpenBrowser : AgentHomeAction
     data object ExpandRunTrace : AgentHomeAction
+    data class EnqueueTask(val taskText: String) : AgentHomeAction
+    data class SteerActiveTask(val instruction: String) : AgentHomeAction
+    data class DeleteTask(val taskId: String) : AgentHomeAction
 }
 
 sealed interface PermissionHealthAction {
@@ -54,6 +57,9 @@ sealed interface AgentChatAction {
     data class DeleteMessage(val id: String) : AgentChatAction
     data class RegenerateMessage(val id: String) : AgentChatAction
     data class SelectReplyCandidate(val id: String, val index: Int) : AgentChatAction
+    data class EnqueueTask(val taskText: String) : AgentChatAction
+    data class SteerActiveTask(val instruction: String) : AgentChatAction
+    data class DeleteTask(val taskId: String) : AgentChatAction
 }
 
 sealed interface AgentToolsAction {
