@@ -122,6 +122,7 @@ fun AgentAppRoot(
                 appViewModel.refreshKimiWeb()
                 agentState.refreshPermissionHealth()
                 agentState.refreshRuntimeResults()
+                agentState.syncAllConversationsFromStore()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

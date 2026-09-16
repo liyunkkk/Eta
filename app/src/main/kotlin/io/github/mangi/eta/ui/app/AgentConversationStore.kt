@@ -120,20 +120,55 @@ internal object AgentConversationStore {
                     )
                     return@withContext
                 }
-                dao.insertConversations(conversations)
-                dao.insertContextCheckpoints(contextCheckpoints)
-                conversationsById.forEach { (convId, state) ->
-                    dao.deleteMessagesForConversation(convId)
-                    val messageEntities = state.messages
-                        .distinctBy { it.id }
-                        .mapIndexedNotNull { index, message ->
-                            message.toEntityOrNull(convId, index)
-                        }
-                    dao.insertMessages(messageEntities)
+                val existingEntities = dao.conversationEntities().associateBy { it.id }
+                val safeConversations = conversationsById.filter { (id, _) ->
+                    val dbEntity = existingEntities[id]
+                    if (dbEntity == null) true
+                    else (updatedAt[id] ?: 0L) >= dbEntity.updatedAt
                 }
-                if (selected != null) {
-                    dao.insertState(ConversationStateEntity(selectedConversationId = selected))
-                    notifyConversationUpdated(selected)
+                val safeSorted = safeConversations.entries
+                    .sortedByDescending { (id, _) -> updatedAt[id] ?: 0L }
+                val safeStoredIds = safeSorted.mapTo(mutableSetOf()) { it.key }
+                val effectiveSelected = selectedConversationId
+                    ?.takeIf { it in safeStoredIds || it in existingEntities }
+                    ?: safeSorted.firstOrNull()?.key
+                    ?: existingEntities.keys.firstOrNull()
+                val safeConversationEntities = safeSorted.map { (id, state) ->
+                    ConversationEntity(
+                        id = id,
+                        title = titles[id].orEmpty(),
+                        thinkingEnabled = state.reasoningEffort.enablesReasoning,
+                        reasoningEffort = state.reasoningEffort.wireValue,
+                        appliedRuntimeRunIdsJson = json.encodeToString(state.appliedRuntimeRunIds),
+                        roleplayJson = state.roleplay?.let { json.encodeToString(it) }.orEmpty(),
+                        revisionsJson = if (state.roleplay == null) "" else json.encodeToString(state.roleplayMessages),
+                        createdAt = updatedAt[id] ?: now,
+                        updatedAt = updatedAt[id] ?: now,
+                    )
+                }
+                val safeContextCheckpoints = safeSorted.map { (conversationId, state) ->
+                    ConversationContextCheckpointEntity(
+                        conversationId = conversationId,
+                        historyJson = AgentConversationCodec.encodeConversationCheckpoint(state.history),
+                        journalJson = AgentConversationCodec.encodeTranscriptForStorage(state.journal.ifEmpty { state.history }),
+                    )
+                }
+                if (safeConversationEntities.isNotEmpty()) {
+                    dao.insertConversations(safeConversationEntities)
+                    dao.insertContextCheckpoints(safeContextCheckpoints)
+                    safeConversations.forEach { (convId, state) ->
+                        dao.deleteMessagesForConversation(convId)
+                        val messageEntities = state.messages
+                            .distinctBy { it.id }
+                            .mapIndexedNotNull { index, message ->
+                                message.toEntityOrNull(convId, index)
+                            }
+                        dao.insertMessages(messageEntities)
+                    }
+                }
+                if (effectiveSelected != null) {
+                    dao.insertState(ConversationStateEntity(selectedConversationId = effectiveSelected))
+                    notifyConversationUpdated(effectiveSelected)
                 }
             }
         }
@@ -428,8 +463,19 @@ internal object AgentConversationStore {
             ?: return null
 
         val metadata = dao.conversationMetadata(targetId) ?: return null
-        val messageEntities = dao.messagesPage(targetId, limit = 100, offset = 0)
-            .sortedBy { it.sortIndex }
+        val messageEntities = buildList {
+            var offset = 0
+            while (true) {
+                val page = dao.messagesPage(
+                    conversationId = targetId,
+                    limit = MESSAGE_LOAD_PAGE_SIZE,
+                    offset = offset,
+                )
+                addAll(page)
+                if (page.size < MESSAGE_LOAD_PAGE_SIZE) break
+                offset += page.size
+            }
+        }.sortedBy { it.sortIndex }
         val messages = messageEntities.mapNotNull { it.toMessageOrNull() }.distinctBy { it.id }
         val checkpoint = dao.contextCheckpoint(targetId)
         val history = AgentConversationCodec.decodeTranscript(checkpoint?.historyJson)

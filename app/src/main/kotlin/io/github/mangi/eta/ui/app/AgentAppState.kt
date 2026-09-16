@@ -700,9 +700,43 @@ internal class AgentAppState(
         }
     }
 
+    fun syncAllConversationsFromStore() {
+        scope.launch(Dispatchers.IO) {
+            val snapshot = AgentConversationStore.load(appContext)
+            withContext(Dispatchers.Main.immediate) {
+                var changed = false
+                val mergedConversations = conversationsById.toMutableMap()
+                val mergedTitles = conversationTitles.toMutableMap()
+                val mergedUpdatedAt = conversationUpdatedAt.toMutableMap()
+                snapshot.conversationsById.forEach { (id, dbState) ->
+                    val memUpdated = conversationUpdatedAt[id] ?: 0L
+                    val dbUpdated = snapshot.updatedAt[id] ?: 0L
+                    val memState = conversationsById[id]
+                    if (memState == null || dbUpdated > memUpdated || dbState.messages.size > memState.messages.size) {
+                        mergedConversations[id] = dbState
+                        snapshot.titles[id]?.let { mergedTitles[id] = it }
+                        mergedUpdatedAt[id] = dbUpdated
+                        changed = true
+                        if (selectedConversationId == id) {
+                            homeState = dbState
+                        }
+                    }
+                }
+                if (changed) {
+                    conversationsById = mergedConversations
+                    conversationTitles = mergedTitles
+                    conversationUpdatedAt = mergedUpdatedAt
+                    refreshConversationSummaries()
+                }
+            }
+        }
+    }
+
     private fun syncConversationFromStore(conversationId: String) {
         scope.launch(Dispatchers.IO) {
             val loaded = AgentConversationStore.loadAssistantConversation(appContext, conversationId) ?: return@launch
+            val dbTime = EtaDatabase.get(appContext).conversationDao().conversationMetadata(conversationId)?.updatedAt
+                ?: System.currentTimeMillis()
             withContext(Dispatchers.Main.immediate) {
                 val existing = conversationsById[conversationId]
                 val updatedState = (existing ?: emptyChatState(defaultThinkingEnabled)).copy(
@@ -716,7 +750,7 @@ internal class AgentAppState(
                 if (loaded.title.isNotBlank()) {
                     conversationTitles = conversationTitles + (conversationId to loaded.title)
                 }
-                conversationUpdatedAt = conversationUpdatedAt + (conversationId to System.currentTimeMillis())
+                conversationUpdatedAt = conversationUpdatedAt + (conversationId to dbTime)
                 if (selectedConversationId == conversationId) {
                     homeState = updatedState
                 }
@@ -771,25 +805,21 @@ internal class AgentAppState(
         val archivedEffort = payload.reasoningEffort
             ?: payload.thinkingEnabled?.let(ReasoningEffort::fromLegacy)
             ?: ReasoningEffort.fromLegacy(defaultThinkingEnabled)
-        val existingState = conversationsById[conversationId] ?: run {
-            val loaded = withContext(Dispatchers.IO) {
-                AgentConversationStore.loadAssistantConversation(appContext, conversationId)
-            }
-            if (loaded != null) {
-                if (conversationTitles[conversationId].isNullOrBlank() && loaded.title.isNotBlank()) {
-                    conversationTitles = conversationTitles + (conversationId to loaded.title)
-                }
-                emptyChatState(archivedEffort.enablesReasoning).copy(
-                    messages = loaded.messages,
-                    history = loaded.history,
-                    journal = loaded.history,
-                    thinkingEnabled = archivedEffort.enablesReasoning,
-                    reasoningEffort = archivedEffort,
-                )
-            } else {
-                emptyChatState(archivedEffort.enablesReasoning).copy(reasoningEffort = archivedEffort)
-            }
+        val dbLoaded = withContext(Dispatchers.IO) {
+            AgentConversationStore.loadAssistantConversation(appContext, conversationId)
         }
+        val existingState = dbLoaded?.let { loaded ->
+            if (conversationTitles[conversationId].isNullOrBlank() && loaded.title.isNotBlank()) {
+                conversationTitles = conversationTitles + (conversationId to loaded.title)
+            }
+            (conversationsById[conversationId] ?: emptyChatState(archivedEffort.enablesReasoning)).copy(
+                messages = loaded.messages,
+                history = loaded.history,
+                journal = loaded.history,
+                thinkingEnabled = archivedEffort.enablesReasoning,
+                reasoningEffort = archivedEffort,
+            )
+        } ?: (conversationsById[conversationId] ?: emptyChatState(archivedEffort.enablesReasoning).copy(reasoningEffort = archivedEffort))
         val alreadyImported = AgentRuntimeHistoryReducer.wasApplied(existingState, runId) ||
             existingState.messages.any {
                 it.id == "user-$runId" ||
@@ -797,7 +827,10 @@ internal class AgentAppState(
                     it.id == "assistant-$runId" ||
                     it.id.startsWith("assistant-$runId-")
             }
-        if (alreadyImported) return runId
+        if (alreadyImported) {
+            conversationsById = conversationsById + (conversationId to existingState)
+            return runId
+        }
 
         if (conversationTitles[conversationId].isNullOrBlank()) {
             conversationTitles = conversationTitles + (conversationId to payload.title)

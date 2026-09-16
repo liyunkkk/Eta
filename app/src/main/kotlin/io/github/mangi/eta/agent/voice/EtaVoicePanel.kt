@@ -18,7 +18,9 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -286,20 +288,36 @@ internal fun EtaVoicePanel(
     onModelSelected: (String) -> Unit,
     onCompactContext: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    onDismissFinished: () -> Unit = {},
 ) {
     val colors = rememberEtaVoicePanelColors()
     val keyboard = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
-    val entryProgress = remember { Animatable(0f) }
-    val exitAlpha by animateFloatAsState(
-        targetValue = if (exitRequested) 0f else 1f,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "assistant_exit",
-    )
+    val transitionProgress = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        entryProgress.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
+        transitionProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = 0.74f,
+                stiffness = 380f,
+            ),
+        )
+    }
+
+    LaunchedEffect(exitRequested) {
+        if (exitRequested) {
+            keyboard?.hide()
+            transitionProgress.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.88f,
+                    stiffness = 520f,
+                ),
+            )
+            onDismissFinished()
+        }
     }
 
     LaunchedEffect(inputFocusRequestKey) {
@@ -312,11 +330,15 @@ internal fun EtaVoicePanel(
         }
     }
 
+    val progress = transitionProgress.value
+    val clampedProgress = progress.coerceIn(0f, 1f)
+    val exitScale = 0.80f + 0.20f * progress
+    val exitTranslationY = (1f - progress) * with(density) { 60.dp.toPx() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { alpha = exitAlpha }
-            .background(colors.scrim.copy(alpha = colors.scrim.alpha * entryProgress.value)),
+            .background(colors.scrim.copy(alpha = colors.scrim.alpha * clampedProgress)),
     ) {
         Box(
             modifier = Modifier
@@ -327,17 +349,15 @@ internal fun EtaVoicePanel(
                     onClick = onClose,
                 ),
         )
-
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = entryProgress.value.coerceIn(0f, 1f)
-                    transformOrigin = TransformOrigin(0.5f, 1.0f)
-                    val scale = 0.88f + 0.12f * entryProgress.value
-                    scaleX = scale
-                    scaleY = scale
-                    translationY = (1f - entryProgress.value) * with(density) { 56.dp.toPx() }
+                    alpha = clampedProgress
+                    transformOrigin = TransformOrigin(0.5f, 0.96f)
+                    scaleX = exitScale
+                    scaleY = exitScale
+                    translationY = exitTranslationY
                 },
         ) {
             val imeBottom = WindowInsets.ime.getBottom(density)

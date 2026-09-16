@@ -135,7 +135,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     // 内部的 NavigationBackHandler 依赖该 owner，缺失会直接 IllegalStateException 崩溃），
     // 由 Service 亲自承担宿主职责：root dispatcher + 系统返回事件输入 + 常驻返回 handler。
     private val backingNavigationEventDispatcher = NavigationEventDispatcher(
-        onBackCompletedFallback = ::dismissAndStop,
+        onBackCompletedFallback = ::dismissAnimated,
     )
     private var navigationEventInput: OnBackInvokedDefaultInput? = null
     private var overlayBackHandler: OverlayPanelBackHandler? = null
@@ -148,7 +148,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         isForwardEnabled = false,
     ) {
         override fun onBackCompleted() {
-            dismissAndStop()
+            dismissAnimated()
         }
     }
     private var runJob: Job? = null
@@ -160,6 +160,13 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     private var hiddenForForegroundOperation = false
     private var handoffInProgress = false
     private var handoffExitRequested by mutableStateOf(false)
+    private var isDismissing by mutableStateOf(false)
+
+    private fun dismissAnimated() {
+        if (isDismissing) return
+        isDismissing = true
+        updateSoftInput(visible = false)
+    }
     private var inputText by mutableStateOf("")
     private var inputFocusRequestKey by mutableIntStateOf(-1)
     private var uiState by mutableStateOf(EtaVoiceUiState())
@@ -241,6 +248,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         hiddenForForegroundOperation = false
         handoffInProgress = false
         handoffExitRequested = false
+        isDismissing = false
         val accessibility = AgentAccessibilityService.current()
         if (accessibility == null) {
             uiState = uiState.copy(
@@ -348,13 +356,14 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                             onNewConversation = ::newConversation,
                             onSubmit = ::submitPrompt,
                             onStop = ::stopCurrentRun,
-                            onClose = ::dismissAndStop,
+                            onClose = ::dismissAnimated,
                             canOpenConversation = !Prefs.isEnabled(Prefs.Keys.AGENT_OVERLAY_PURE_MODE) &&
                                 activeRunId == null &&
                                 (uiState.messages.any { message ->
                                     message is AgentMessageUi && message.content.isNotBlank()
                                 } || currentConversationId != null),
-                            exitRequested = handoffExitRequested,
+                            exitRequested = isDismissing || handoffExitRequested,
+                            onDismissFinished = ::dismissAndStop,
                             onOpenConversation = ::openConversation,
                             onAttachImage = ::attachImage,
                             onRemoveImage = ::removePendingImage,

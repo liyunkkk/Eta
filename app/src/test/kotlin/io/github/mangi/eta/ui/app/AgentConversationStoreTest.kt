@@ -523,4 +523,38 @@ class AgentConversationStoreTest {
         assertTrue(recent.any { it.id == "conv-joke" && it.title == "讲笑话" })
     }
 
+
+    @Test
+    fun saveDoesNotOverwriteNewerAssistantConversation() = runBlocking {
+        val assistantMsg1 = UserMessageUi(id = "u1", content = "浮窗提问")
+        val assistantMsg2 = AgentMessageUi(id = "a1", content = "浮窗回答", isStreaming = false)
+        AgentConversationStore.saveAssistantConversation(
+            context = context,
+            conversationId = "conv-sync-test",
+            title = "浮窗最新会话",
+            messages = listOf(assistantMsg1, assistantMsg2),
+            history = listOf(AgentModelClient.ConversationMessage(role = "user", content = "浮窗提问")),
+        )
+
+        AgentConversationStore.save(
+            context = context,
+            selectedConversationId = "conv-sync-test",
+            conversationsById = mapOf(
+                "conv-sync-test" to AgentChatHomeUiState(
+                    messages = listOf(UserMessageUi(id = "u-old", content = "本体旧消息")),
+                    input = "",
+                    isStreaming = false,
+                    thinkingEnabled = false,
+                )
+            ),
+            titles = mapOf("conv-sync-test" to "本体旧标题"),
+            updatedAt = mapOf("conv-sync-test" to 100L),
+        )
+
+        val loaded = AgentConversationStore.loadAssistantConversation(context, "conv-sync-test")
+        assertNotNull(loaded)
+        assertEquals(2, loaded?.messages?.size)
+        assertEquals("浮窗提问", (loaded?.messages?.get(0) as UserMessageUi).content)
+        assertEquals("浮窗回答", (loaded?.messages?.get(1) as AgentMessageUi).content)
+    }
 }
