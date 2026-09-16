@@ -71,6 +71,7 @@ import io.github.mangi.eta.data.repository.ProviderRepository
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
 import io.github.mangi.eta.ui.MainActivity
 import io.github.mangi.eta.ui.app.AgentAppTheme
+import io.github.mangi.eta.ui.app.AgentAppState
 import io.github.mangi.eta.ui.app.AgentConversationStore
 import io.github.mangi.eta.ui.app.AgentRunMessageProjector
 import io.github.mangi.eta.ui.model.AgentChatMessageUi
@@ -503,7 +504,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         screenContextAttachment = null
         inputText = ""
         if (currentConversationId == null) {
-            currentConversationId = UUID.randomUUID().toString()
+            currentConversationId = AgentAppState.newConversationId()
         }
         val targetConvId = currentConversationId!!
         val newTitle = uiState.conversationTitle.ifBlank { normalized.take(40) }

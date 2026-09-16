@@ -681,8 +681,10 @@ internal class AgentAppState(
         if (archivedRuns.isEmpty()) return
 
         withContext(Dispatchers.Main) {
-            val importedRunIds = archivedRuns.mapNotNull { archivedRun ->
-                importExternalRun(archivedRun)
+            val importedRunIds = buildList {
+                for (archivedRun in archivedRuns) {
+                    importExternalRun(archivedRun)?.let(::add)
+                }
             }
             refreshConversationSummaries()
             persistConversations {
@@ -702,6 +704,24 @@ internal class AgentAppState(
                 conversationKey = conversationKey,
             )
             if (conversationsById[conversationId] == null) {
+                val loaded = withContext(Dispatchers.IO) {
+                    AgentConversationStore.loadAssistantConversation(appContext, conversationId)
+                }
+                if (loaded != null) {
+                    conversationsById = conversationsById + (conversationId to AgentChatHomeUiState(
+                        messages = loaded.messages,
+                        history = loaded.history,
+                        journal = loaded.history,
+                        thinkingEnabled = defaultThinkingEnabled,
+                        reasoningEffort = ReasoningEffort.fromLegacy(defaultThinkingEnabled),
+                    ))
+                    if (loaded.title.isNotBlank()) {
+                        conversationTitles = conversationTitles + (conversationId to loaded.title)
+                    }
+                    refreshConversationSummaries()
+                }
+            }
+            if (conversationsById[conversationId] == null) {
                 false
             } else {
                 selectConversation(conversationId)
@@ -710,7 +730,7 @@ internal class AgentAppState(
         }
     }
 
-    private fun importExternalRun(archivedRun: AgentRunArchiveStore.ArchivedRun): String? {
+    private suspend fun importExternalRun(archivedRun: AgentRunArchiveStore.ArchivedRun): String? {
         val runId = archivedRun.result.runId.ifBlank { archivedRun.handoff.id }
         if (runId.isBlank()) return null
         val payload = AgentExternalArchivePayload.from(archivedRun.handoff.payload) ?: return null
@@ -721,9 +741,25 @@ internal class AgentAppState(
         val archivedEffort = payload.reasoningEffort
             ?: payload.thinkingEnabled?.let(ReasoningEffort::fromLegacy)
             ?: ReasoningEffort.fromLegacy(defaultThinkingEnabled)
-        val existingState = conversationsById[conversationId] ?: emptyChatState(
-            archivedEffort.enablesReasoning
-        ).copy(reasoningEffort = archivedEffort)
+        val existingState = conversationsById[conversationId] ?: run {
+            val loaded = withContext(Dispatchers.IO) {
+                AgentConversationStore.loadAssistantConversation(appContext, conversationId)
+            }
+            if (loaded != null) {
+                if (conversationTitles[conversationId].isNullOrBlank() && loaded.title.isNotBlank()) {
+                    conversationTitles = conversationTitles + (conversationId to loaded.title)
+                }
+                AgentChatHomeUiState(
+                    messages = loaded.messages,
+                    history = loaded.history,
+                    journal = loaded.history,
+                    thinkingEnabled = archivedEffort.enablesReasoning,
+                    reasoningEffort = archivedEffort,
+                )
+            } else {
+                emptyChatState(archivedEffort.enablesReasoning).copy(reasoningEffort = archivedEffort)
+            }
+        }
         val alreadyImported = AgentRuntimeHistoryReducer.wasApplied(existingState, runId) ||
             existingState.messages.any {
                 it is AgentMessageUi &&
@@ -2615,12 +2651,14 @@ private fun String.isReadOnlyExternalArchiveConversation(): Boolean =
     startsWith(EXTERNAL_ARCHIVE_CONVERSATION_PREFIX)
 
 private fun archiveConversationId(source: String, conversationKey: String): String {
-    val prefix = if (source == AgentRuntimeWire.ETA_VOICE_HANDOFF_SOURCE) {
-        ASSISTANT_CONVERSATION_PREFIX
-    } else {
-        EXTERNAL_ARCHIVE_CONVERSATION_PREFIX
+    if (source == AgentRuntimeWire.ETA_VOICE_HANDOFF_SOURCE) {
+        val unwrapped = conversationKey.removePrefix("eta_assistant_").trim()
+        if (unwrapped.isNotBlank() && unwrapped != "transient") {
+            return unwrapped
+        }
+        return ASSISTANT_CONVERSATION_PREFIX + stableArchiveId("$source:$conversationKey")
     }
-    return prefix + stableArchiveId("$source:$conversationKey")
+    return EXTERNAL_ARCHIVE_CONVERSATION_PREFIX + stableArchiveId("$source:$conversationKey")
 }
 
 private const val ASSISTANT_CONVERSATION_PREFIX = "assistant-"
