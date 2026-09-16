@@ -500,7 +500,11 @@ internal fun AgentConversationMessages(
                 isUserDragging = isUserDragging,
             )
         ) {
-            scrollState.requestScrollToItem(bottomItemIndex)
+            val lastVisible = scrollState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            if (bottomItemIndex - lastVisible > 6) {
+                scrollState.scrollToItem(bottomItemIndex - 7)
+            }
+            scrollState.animateScrollToItem(bottomItemIndex)
         }
     }
 

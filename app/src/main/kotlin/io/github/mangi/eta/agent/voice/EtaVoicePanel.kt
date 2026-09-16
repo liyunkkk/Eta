@@ -508,10 +508,14 @@ private fun BoxScope.AssistantPanel(
         if (imeOverlapPx > 0) {
             if (state.isHistoryMenuVisible) onToggleHistoryMenu()
             if (keepBottomAnchored && state.messages.isNotEmpty()) {
-                delay(60)
+                delay(80)
                 val count = listState.layoutInfo.totalItemsCount
                 if (count > 0) {
-                    listState.scrollToItem(count - 1)
+                    val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    if (count - 1 - lastVisible > 6) {
+                        listState.scrollToItem(count - 7)
+                    }
+                    listState.animateScrollToItem(count - 1)
                 }
             }
         }
@@ -610,68 +614,6 @@ private fun BoxScope.AssistantPanel(
         }
     }
 
-    val dragByState = rememberUpdatedState<(Float) -> Float>(::dragBy)
-    val finishDragState = rememberUpdatedState<(Float) -> Unit>(::finishDrag)
-    val nestedScrollConnection = remember(
-        baseContentHeightPx,
-        maxContentHeightPx,
-        canOpenConversation,
-        listState,
-    ) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val current = draggedHeightPx ?: currentAnimatedHeight.value
-                if (
-                    available.y < 0f &&
-                    canOpenConversation &&
-                    current >= maxContentHeightPx * 0.95f
-                ) {
-                    directHandoffPullPx += -available.y
-                    if (directHandoffPullPx >= directHandoffThresholdPx) {
-                        triggerHandoff()
-                    }
-                    return Offset(0f, available.y)
-                }
-                // 全屏展开且列表到顶时，向下拉才允许在 preScroll 缩回半屏
-                if (available.y > 0f && current > baseContentHeightPx && !listState.canScrollBackward) {
-                    return Offset(0f, dragByState.value(available.y))
-                }
-                // 正常浏览历史：完全不拦截，交给 LazyColumn
-                return Offset.Zero
-            }
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                if (available.y == 0f) return Offset.Zero
-                val current = draggedHeightPx ?: currentAnimatedHeight.value
-                if (available.y < 0f && current < maxContentHeightPx && !listState.canScrollForward) {
-                    return Offset(0f, dragByState.value(available.y))
-                }
-                if (available.y > 0f && !listState.canScrollBackward) {
-                    return Offset(0f, dragByState.value(available.y))
-                }
-                return Offset.Zero
-            }
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                if (draggedHeightPx != null || dismissPullPx > 0f || handoffPullPx > 0f) {
-                    finishDragState.value(available.y)
-                    return available
-                }
-                return Velocity.Zero
-            }
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (available.y < -400f && !listState.canScrollForward) {
-                    settledHeightPx = maxContentHeightPx
-                } else if (available.y > 400f && !listState.canScrollBackward) {
-                    settledHeightPx = baseContentHeightPx
-                }
-                finishDragState.value(available.y)
-                return Velocity.Zero
-            }
-        }
-    }
     val bottomInset = with(density) { bottomInsetPx.toDp() }
     val messageRevealOffsetPx = with(density) { 12.dp.toPx() }
     val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
@@ -715,8 +657,7 @@ private fun BoxScope.AssistantPanel(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(with(density) { visibleSheetHeightPx.toDp() })
-                    .nestedScroll(nestedScrollConnection),
+                    .height(with(density) { visibleSheetHeightPx.toDp() }),
             ) {
                 Spacer(
                     modifier = Modifier
@@ -857,9 +798,7 @@ private fun AssistantComposer(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     Column(
-        modifier = modifier.animateContentSize(
-            animationSpec = folmeSpring(damping = 0.92f, response = 0.34f),
-        ),
+        modifier = modifier,
     ) {
         Row(
             modifier = Modifier
