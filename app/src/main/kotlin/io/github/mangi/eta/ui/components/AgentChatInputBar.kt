@@ -333,8 +333,9 @@ internal fun AgentChatInputBar(
                             onOpenModelProviders = onOpenModelProviders,
                         )
 
+                        val isStopMode = isStreaming && !canSend
                         IconButton(
-                            onClick = if (isStreaming) {
+                            onClick = if (isStopMode) {
                                 onStop
                             } else {
                                 {
@@ -345,14 +346,14 @@ internal fun AgentChatInputBar(
                                     }
                                 }
                             },
-                            enabled = isStreaming || canSend,
+                            enabled = isStopMode || canSend,
                             minWidth = ChatInputActionSize,
                             minHeight = ChatInputActionSize,
                         ) {
                             // 保留统一的点击区域，仅让可见圆形与相邻操作图标保持同一尺寸。
                             val sendButtonColor by animateColorAsState(
                                 targetValue = when {
-                                    isStreaming -> MiuixTheme.colorScheme.onSurface
+                                    isStopMode -> MiuixTheme.colorScheme.onSurface
                                     canSend -> MiuixTheme.colorScheme.primary
                                     else -> MiuixTheme.colorScheme.surfaceContainerHigh
                                 },
@@ -367,7 +368,7 @@ internal fun AgentChatInputBar(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 AnimatedContent(
-                                    targetState = isStreaming,
+                                    targetState = isStopMode,
                                     transitionSpec = {
                                         (fadeIn(tween(130)) + scaleIn(tween(160), initialScale = 0.72f))
                                             .togetherWith(
@@ -376,23 +377,24 @@ internal fun AgentChatInputBar(
                                             )
                                     },
                                     label = "send_stop_icon",
-                                ) { streaming ->
+                                ) { stopMode ->
                                     Icon(
-                                        imageVector = if (streaming) {
+                                        imageVector = if (stopMode) {
                                             Icons.Rounded.Stop
                                         } else {
                                             Icons.Rounded.ArrowUpward
                                         },
                                         contentDescription = when {
-                                            streaming -> stringResource(R.string.chat_stop)
+                                            stopMode -> stringResource(R.string.chat_stop)
+                                            isStreaming -> "追加指令"
                                             isEditingMessage && preserveFollowingMessages -> "保存消息"
                                             else -> stringResource(R.string.chat_send)
                                         },
                                         modifier = Modifier.size(
-                                            if (streaming) StopIconSize else SendIconSize
+                                            if (stopMode) StopIconSize else SendIconSize
                                         ),
                                         tint = when {
-                                            streaming -> MiuixTheme.colorScheme.surface
+                                            stopMode -> MiuixTheme.colorScheme.surface
                                             canSend -> MiuixTheme.colorScheme.onPrimary
                                             else -> MiuixTheme.colorScheme.onSurfaceVariantActions
                                         },

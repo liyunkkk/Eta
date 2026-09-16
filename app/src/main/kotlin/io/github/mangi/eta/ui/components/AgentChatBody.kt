@@ -948,42 +948,38 @@ private fun AgentChatBottomBar(
             var isTaskDashboardExpanded by remember { mutableStateOf(false) }
             var selectedTaskTab by remember { mutableStateOf(1) }
             var steeringInput by remember { mutableStateOf("") }
-
-            if (taskQueueState.hasTasks) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TaskStatusCapsuleBadge(
-                        state = taskQueueState,
-                        isExpanded = isTaskDashboardExpanded,
-                        onClick = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = isTaskDashboardExpanded,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                ) {
-                    TaskTriTabDashboard(
-                        state = taskQueueState,
-                        selectedTab = selectedTaskTab,
-                        onTabSelected = { selectedTaskTab = it },
-                        steeringInput = steeringInput,
-                        onSteeringInputChange = { steeringInput = it },
-                        onSendSteering = {
-                            if (steeringInput.isNotBlank()) {
-                                onSteerTask(steeringInput)
-                                steeringInput = ""
-                            }
-                        },
-                        onDeleteTask = onDeleteTask,
-                        isFloatingOverlay = false,
-                    )
-                }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TaskStatusCapsuleBadge(
+                    state = taskQueueState,
+                    isExpanded = isTaskDashboardExpanded,
+                    onClick = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
+                )
+            }
+            AnimatedVisibility(
+                visible = isTaskDashboardExpanded,
+                modifier = Modifier.padding(bottom = 8.dp),
+            ) {
+                TaskTriTabDashboard(
+                    state = taskQueueState,
+                    selectedTab = selectedTaskTab,
+                    onTabSelected = { selectedTaskTab = it },
+                    steeringInput = steeringInput,
+                    onSteeringInputChange = { steeringInput = it },
+                    onSendSteering = {
+                        if (steeringInput.isNotBlank()) {
+                            onSteerTask(steeringInput)
+                            steeringInput = ""
+                        }
+                    },
+                    onDeleteTask = onDeleteTask,
+                    isFloatingOverlay = false,
+                )
             }
 
             AgentChatInputBar(

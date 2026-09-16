@@ -1073,10 +1073,66 @@ internal class AgentAppState(
         val prompt = (submittedText ?: homeState.input).trim()
         val pendingImages = homeState.pendingImages
         val pendingFileReferences = homeState.pendingFileReferences
-        if (
-            (prompt.isBlank() && pendingImages.isEmpty() && pendingFileReferences.isEmpty()) ||
-            homeState.isStreaming
-        ) {
+        if (prompt.isBlank() && pendingImages.isEmpty() && pendingFileReferences.isEmpty()) {
+            return
+        }
+
+        // 1. 运行中追加指令（Mid-run Steering）或降级排队（Auto Enqueue）
+        if (homeState.isStreaming) {
+            if (prompt.isNotBlank()) {
+                steerActiveTask(prompt)
+                updateCurrentConversation(homeState.copy(input = ""))
+            }
+            return
+        }
+
+        // 2. 显式指令前缀：/task, /queue, /q
+        val taskPrefixRegex = Regex("^/(task|queue|q)\\s+", RegexOption.IGNORE_CASE)
+        val taskPrefixMatch = taskPrefixRegex.find(prompt)
+        if (taskPrefixMatch != null) {
+            val taskContent = prompt.substring(taskPrefixMatch.range.last + 1).trim()
+            if (taskContent.isNotBlank()) {
+                enqueueTask(taskContent)
+                updateCurrentConversation(
+                    homeState.copy(
+                        input = "",
+                        pendingImages = emptyList(),
+                        pendingFileReferences = emptyList(),
+                    )
+                )
+                return
+            }
+        }
+
+        // 3. 多任务清单语法自动识别（Batch Enqueue）
+        val parsedTasks = parseTaskListFromPrompt(prompt)
+        if (parsedTasks.size >= 2) {
+            val conversationId = selectedConversationId
+            if (conversationId != null) {
+                scope.launch {
+                    taskManager.enqueueTasks(conversationId, parsedTasks)
+                }
+                updateCurrentConversation(
+                    homeState.copy(
+                        input = "",
+                        pendingImages = emptyList(),
+                        pendingFileReferences = emptyList(),
+                    )
+                )
+                return
+            }
+        }
+
+        // 4. 若任务队列当前已有待执行/运行任务，自动排入队尾
+        if (!taskManager.uiState.value.isIdle) {
+            enqueueTask(prompt)
+            updateCurrentConversation(
+                homeState.copy(
+                    input = "",
+                    pendingImages = emptyList(),
+                    pendingFileReferences = emptyList(),
+                )
+            )
             return
         }
         homeState.messageEdit?.takeIf { it.preserveFollowingMessages }?.let { edit ->
@@ -2711,6 +2767,39 @@ internal class AgentAppState(
         scope.launch {
             taskManager.deleteTask(taskId)
         }
+    }
+
+    private fun parseTaskListFromPrompt(text: String): List<Pair<String, String>> {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.size < 2) return emptyList()
+
+        val taskList = mutableListOf<Pair<String, String>>()
+        val checkboxRegex = Regex("^[-*]\\s*\\[[ xX]?\\]\\s*(.+)$")
+        val numberedRegex = Regex("^(\\d+)[.、]\\s*(.+)$")
+
+        val isAllCheckbox = lines.all { checkboxRegex.matches(it) }
+        val isAllNumbered = lines.all { numberedRegex.matches(it) }
+
+        if (isAllCheckbox) {
+            lines.forEach { line ->
+                val match = checkboxRegex.matchEntire(line)
+                val content = match?.groupValues?.get(1)?.trim().orEmpty()
+                if (content.isNotBlank()) {
+                    val title = content.take(MAX_TITLE_CHARS)
+                    taskList.add(title to content)
+                }
+            }
+        } else if (isAllNumbered) {
+            lines.forEach { line ->
+                val match = numberedRegex.matchEntire(line)
+                val content = match?.groupValues?.get(2)?.trim().orEmpty()
+                if (content.isNotBlank()) {
+                    val title = content.take(MAX_TITLE_CHARS)
+                    taskList.add(title to content)
+                }
+            }
+        }
+        return if (taskList.size >= 2) taskList else emptyList()
     }
 
     private companion object {
