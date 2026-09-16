@@ -708,7 +708,7 @@ internal class AgentAppState(
                     AgentConversationStore.loadAssistantConversation(appContext, conversationId)
                 }
                 if (loaded != null) {
-                    conversationsById = conversationsById + (conversationId to AgentChatHomeUiState(
+                    conversationsById = conversationsById + (conversationId to emptyChatState(defaultThinkingEnabled).copy(
                         messages = loaded.messages,
                         history = loaded.history,
                         journal = loaded.history,
@@ -749,7 +749,7 @@ internal class AgentAppState(
                 if (conversationTitles[conversationId].isNullOrBlank() && loaded.title.isNotBlank()) {
                     conversationTitles = conversationTitles + (conversationId to loaded.title)
                 }
-                AgentChatHomeUiState(
+                emptyChatState(archivedEffort.enablesReasoning).copy(
                     messages = loaded.messages,
                     history = loaded.history,
                     journal = loaded.history,
