@@ -3,10 +3,10 @@ package io.github.mangi.eta.agent.task
 import android.content.Context
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.agent.runtime.AgentEvent
-import io.github.mangi.eta.agent.runtime.AgentLogger
+import io.github.mangi.eta.core.AgentLogger
 import io.github.mangi.eta.agent.runtime.AgentRuntimeClient
 import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
-import io.github.mangi.eta.agent.runtime.AndroidAgentLogger
+import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.db.EtaDatabase
 import io.github.mangi.eta.data.db.TaskQueueDao
 import io.github.mangi.eta.data.db.TaskQueueEntity
