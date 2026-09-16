@@ -11,7 +11,7 @@ class AgentNotificationTrampolineActivity : Activity() {
         super.onCreate(savedInstanceState)
         try {
             val source = intent.getStringExtra(EXTRA_SOURCE)
-            if (source == SOURCE_OVERLAY && EtaAssistantOverlayService.isServiceActive()) {
+            if (source == SOURCE_OVERLAY || EtaAssistantOverlayService.isServiceActive()) {
                 EtaAssistantOverlayService.show(this)
             } else {
                 val mainIntent = Intent(this, MainActivity::class.java).apply {

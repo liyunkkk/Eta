@@ -87,8 +87,11 @@ internal class AgentExecutionService : Service() {
     }
 
     private fun notification(): Notification {
+        val openIntent = Intent(this, AgentNotificationTrampolineActivity::class.java).apply {
+            putExtra(AgentNotificationTrampolineActivity.EXTRA_SOURCE, currentSource)
+        }
         val open = PendingIntent.getActivity(
-            this, 0, Intent(this, AgentNotificationTrampolineActivity::class.java),
+            this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val stop = PendingIntent.getService(
@@ -149,6 +152,7 @@ internal class AgentExecutionService : Service() {
         private val mainHandler = Handler(Looper.getMainLooper())
         @Volatile private var instance: AgentExecutionService? = null
         @Volatile private var executionState = AgentExecutionState()
+        @Volatile private var currentSource: String = AgentNotificationTrampolineActivity.SOURCE_MAIN
 
         fun ensureChannels(context: Context, manager: NotificationManager) {
             val executionChannel = NotificationChannel(
@@ -222,8 +226,10 @@ internal class AgentExecutionService : Service() {
             context: Context,
             id: String,
             allowBoundFallback: Boolean = false,
+            source: String = AgentNotificationTrampolineActivity.SOURCE_MAIN,
             onStop: () -> Unit,
         ): Boolean {
+            currentSource = source
             if (instance?.startRejected == true) return false
             if (!leases.acquire(id, allowBoundFallback, onStop)) return true
             return try {
@@ -240,6 +246,7 @@ internal class AgentExecutionService : Service() {
             leases.release(id)
             if (leases.count() == 0) {
                 executionState = AgentExecutionState()
+                currentSource = AgentNotificationTrampolineActivity.SOURCE_MAIN
             }
             mainHandler.post { instance?.refreshNotification() }
         }

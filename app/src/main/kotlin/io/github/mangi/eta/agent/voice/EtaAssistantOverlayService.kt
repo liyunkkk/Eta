@@ -158,6 +158,29 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
     private var presentedEntryGeneration = -1L
     private var screenContextAttachment: EtaScreenContextAttachment? = null
     private var hiddenForForegroundOperation = false
+    private var isPausedForPicker = false
+
+    private fun pauseWindowForPicker() {
+        if (isPausedForPicker) return
+        isPausedForPicker = true
+        updateSoftInput(visible = false)
+        removeWindow()
+    }
+
+    private fun resumeWindowFromPicker() {
+        if (!isPausedForPicker) return
+        isPausedForPicker = false
+        isDismissing = false
+        if (detachingWindowView != null) {
+            windowDetachCallbacks.add {
+                if (!isPausedForPicker && windowView == null) {
+                    showWindow()
+                }
+            }
+        } else {
+            showWindow()
+        }
+    }
     private var handoffInProgress = false
     private var handoffExitRequested by mutableStateOf(false)
     private var isDismissing by mutableStateOf(false)
@@ -1605,6 +1628,18 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             context.applicationContext.stopService(
                 Intent(context.applicationContext, EtaAssistantOverlayService::class.java),
             )
+        }
+
+        fun pauseForAttachmentPicker() {
+            mainHandler.post {
+                activeService?.pauseWindowForPicker()
+            }
+        }
+
+        fun resumeFromAttachmentPicker() {
+            mainHandler.post {
+                activeService?.resumeWindowFromPicker()
+            }
         }
 
         fun notifyHandoffReady(context: Context) {

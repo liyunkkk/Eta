@@ -6,13 +6,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import io.github.mangi.eta.agent.voice.EtaAssistantOverlayService
 
 /**
  * 透明的 Trampoline Activity，用于在悬浮窗 Service 等无法直接提供 LocalActivityResultRegistryOwner 的场景中
- * 调起系统相册、文件选择器或目录选择器，并通过静态回调将结果安全回传。
+ * 调起系统相册、文件选择器或目录选择器，并在调起期间让出屏幕避让底层选择器，通过静态回调安全回传。
  */
 class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
-
     companion object {
         const val EXTRA_ACTION = "action"
         const val ACTION_PICK_IMAGES = "pick_images"
@@ -22,9 +22,13 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
         private var onImagesCallback: ((List<String>) -> Unit)? = null
         private var onFilesCallback: ((List<String>) -> Unit)? = null
         private var onFolderCallback: ((String) -> Unit)? = null
+        @Volatile
+        private var hasResumedOverlay = false
 
         fun pickImages(context: Context, onResult: (List<String>) -> Unit) {
             onImagesCallback = onResult
+            hasResumedOverlay = false
+            EtaAssistantOverlayService.pauseForAttachmentPicker()
             val intent = Intent(context, AgentAttachmentPickerTrampolineActivity::class.java).apply {
                 putExtra(EXTRA_ACTION, ACTION_PICK_IMAGES)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -34,6 +38,8 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
 
         fun pickFiles(context: Context, onResult: (List<String>) -> Unit) {
             onFilesCallback = onResult
+            hasResumedOverlay = false
+            EtaAssistantOverlayService.pauseForAttachmentPicker()
             val intent = Intent(context, AgentAttachmentPickerTrampolineActivity::class.java).apply {
                 putExtra(EXTRA_ACTION, ACTION_PICK_FILES)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -43,11 +49,20 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
 
         fun pickFolder(context: Context, onResult: (String) -> Unit) {
             onFolderCallback = onResult
+            hasResumedOverlay = false
+            EtaAssistantOverlayService.pauseForAttachmentPicker()
             val intent = Intent(context, AgentAttachmentPickerTrampolineActivity::class.java).apply {
                 putExtra(EXTRA_ACTION, ACTION_PICK_FOLDER)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
+        }
+
+        internal fun safeResumeOverlay() {
+            if (!hasResumedOverlay) {
+                hasResumedOverlay = true
+                EtaAssistantOverlayService.resumeFromAttachmentPicker()
+            }
         }
     }
 
@@ -68,6 +83,7 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
             }
         } finally {
             onImagesCallback = null
+            safeResumeOverlay()
             finish()
         }
     }
@@ -89,6 +105,7 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
             }
         } finally {
             onFilesCallback = null
+            safeResumeOverlay()
             finish()
         }
     }
@@ -108,6 +125,7 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
             }
         } finally {
             onFolderCallback = null
+            safeResumeOverlay()
             finish()
         }
     }
@@ -115,6 +133,7 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) {
+            safeResumeOverlay()
             finish()
             return
         }
@@ -128,7 +147,15 @@ class AgentAttachmentPickerTrampolineActivity : ComponentActivity() {
             ACTION_PICK_FOLDER -> {
                 folderPicker.launch(null)
             }
-            else -> finish()
+            else -> {
+                safeResumeOverlay()
+                finish()
+            }
         }
+    }
+
+    override fun onDestroy() {
+        safeResumeOverlay()
+        super.onDestroy()
     }
 }

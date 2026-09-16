@@ -326,8 +326,13 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         )
         // Root 入口保留原有绑定服务生命周期；新增 FGS 不能成为厂商后台入口的新前置权限。
         val allowBoundFallback = RootAccess.isGranted
+        val executionSource = if (request.handoff?.source == AgentRuntimeWire.ETA_VOICE_HANDOFF_SOURCE) {
+            AgentNotificationTrampolineActivity.SOURCE_OVERLAY
+        } else {
+            AgentNotificationTrampolineActivity.SOURCE_MAIN
+        }
         val executionHeld = AgentExecutionService.acquire(
-            this, "run:${request.runId}", allowBoundFallback = allowBoundFallback,
+            this, "run:${request.runId}", allowBoundFallback = allowBoundFallback, source = executionSource,
         ) { session.controller.cancel() }
         if (!executionHeld && !allowBoundFallback) {
             session.complete(AgentRuntimeWire.RunResult(

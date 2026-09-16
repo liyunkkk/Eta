@@ -300,8 +300,8 @@ internal fun EtaVoicePanel(
         transitionProgress.animateTo(
             targetValue = 1f,
             animationSpec = spring(
-                dampingRatio = 0.74f,
-                stiffness = 380f,
+                dampingRatio = 0.88f,
+                stiffness = 520f,
             ),
         )
     }
@@ -312,8 +312,8 @@ internal fun EtaVoicePanel(
             transitionProgress.animateTo(
                 targetValue = 0f,
                 animationSpec = spring(
-                    dampingRatio = 0.88f,
-                    stiffness = 520f,
+                    dampingRatio = 0.94f,
+                    stiffness = 650f,
                 ),
             )
             onDismissFinished()
@@ -332,8 +332,8 @@ internal fun EtaVoicePanel(
 
     val progress = transitionProgress.value
     val clampedProgress = progress.coerceIn(0f, 1f)
-    val exitScale = 0.80f + 0.20f * progress
-    val exitTranslationY = (1f - progress) * with(density) { 60.dp.toPx() }
+    val panelScale = 0.93f + 0.07f * clampedProgress
+    val panelTranslationY = (1f - clampedProgress) * with(density) { 24.dp.toPx() }
 
     Box(
         modifier = Modifier
@@ -354,10 +354,10 @@ internal fun EtaVoicePanel(
                 .fillMaxSize()
                 .graphicsLayer {
                     alpha = clampedProgress
-                    transformOrigin = TransformOrigin(0.5f, 0.96f)
-                    scaleX = exitScale
-                    scaleY = exitScale
-                    translationY = exitTranslationY
+                    transformOrigin = TransformOrigin(0.5f, 0.85f)
+                    scaleX = panelScale
+                    scaleY = panelScale
+                    translationY = panelTranslationY
                 },
         ) {
             val imeBottom = WindowInsets.ime.getBottom(density)
