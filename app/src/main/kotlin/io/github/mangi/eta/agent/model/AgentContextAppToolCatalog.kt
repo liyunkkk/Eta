@@ -125,5 +125,77 @@ internal object AgentContextAppToolCatalog {
                         )
                 )
             )
+            .put(
+                AgentToolSchema.function(
+                    name = "get_assistant_config",
+                    description = "获取 Eta 自身当前的运行状态、模型配置与功能开关（已自动进行脱敏保护）。当用户询问当前使用的是什么模型、中转站/服务商、思考模式开关或自身设置时调用此工具直接静默读取，严禁操控屏幕去设置界面翻找。",
+                    parameters = JSONObject()
+                        .put("type", "object")
+                        .put("properties", JSONObject())
+                )
+            )
+            .put(
+                AgentToolSchema.function(
+                    name = "update_assistant_config",
+                    description = "安全修改 Eta 自身的部分运行设置或切换已配置的模型/服务商。仅支持白名单受控项，严禁传入敏感 API Key/Token 明文。",
+                    parameters = JSONObject()
+                        .put("type", "object")
+                        .put(
+                            "properties",
+                            JSONObject()
+                                .put(
+                                    "action",
+                                    JSONObject()
+                                        .put("type", "string")
+                                        .put("enum", JSONArray().put("switch_model").put("switch_provider").put("toggle_setting"))
+                                        .put("description", "修改动作类型：switch_model（切换模型）、switch_provider（切换服务商）、toggle_setting（切换开关）")
+                                )
+                                .put(
+                                    "target",
+                                    JSONObject()
+                                        .put("type", "string")
+                                        .put("description", "目标标识：若为 switch_model 则传入 model_id 或模型名称；若为 switch_provider 则传入 provider_id 或服务商名称；若为 toggle_setting 则传入开关名称（如 thinking_mode, pure_mode, terminal_tools, browser_tools, kimi_builtin_browser）")
+                                )
+                                .put(
+                                    "value",
+                                    JSONObject()
+                                        .put("type", "string")
+                                        .put("description", "开关设置的新值，例如 \"true\" 或 \"false\"（仅 toggle_setting 时需要）")
+                                )
+                        )
+                        .put("required", JSONArray().put("action").put("target"))
+                )
+            )
+            .put(
+                AgentToolSchema.function(
+                    name = "delegate_to_kimi_code",
+                    description = "将复杂代码编写、重构或项目文件批量修改任务委派给内置的 Kimi Code 编程子代理执行。子代理运行在隔离的 Linux 环境中，能够就地读写代码、运行测试并汇报变更。适用于多文件代码修改、逻辑重构、写脚本等重型编码任务。",
+                    parameters = JSONObject()
+                        .put("type", "object")
+                        .put(
+                            "properties",
+                            JSONObject()
+                                .put(
+                                    "task",
+                                    JSONObject()
+                                        .put("type", "string")
+                                        .put("description", "具体的重构或编码任务描述与指令")
+                                )
+                                .put(
+                                    "project_path",
+                                    JSONObject()
+                                        .put("type", "string")
+                                        .put("description", "工作目录绝对路径，默认 /workspace")
+                                )
+                                .put(
+                                    "timeout_seconds",
+                                    JSONObject()
+                                        .put("type", "integer")
+                                        .put("description", "执行超时时间（秒），默认 120，范围 10 到 600")
+                                )
+                        )
+                        .put("required", JSONArray().put("task"))
+                )
+            )
     }
 }

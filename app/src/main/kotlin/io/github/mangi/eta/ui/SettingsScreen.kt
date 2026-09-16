@@ -327,6 +327,13 @@ internal fun SettingsScreen(
                         },
                         onClick = { onNavigate(AppRoute.LinuxEnvironment) },
                     )
+                    SwitchPref(
+                        context = context,
+                        prefs = agentPrefs,
+                        title = "Kimi Web 默认使用内置浏览器",
+                        key = Prefs.Keys.KIMI_WEB_USE_BUILTIN_BROWSER,
+                        icon = Icons.Rounded.Language,
+                    )
                 }
             }
 

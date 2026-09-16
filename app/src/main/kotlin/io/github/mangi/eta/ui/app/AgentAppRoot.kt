@@ -1,5 +1,4 @@
 package io.github.mangi.eta.ui.app
-
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -9,6 +8,8 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import io.github.mangi.eta.agent.browser.AgentBrowserSession
+import io.github.mangi.eta.config.Prefs
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -227,12 +228,20 @@ fun AgentAppRoot(
                 requestExecutionNotifications()
                 if (appViewModel.kimiWebState.phase != KimiWebPhase.NOT_INSTALLED) {
                     appViewModel.launchKimiWeb { result ->
-                        if (result is KimiWebLaunchResult.Failed) {
-                            Toast.makeText(
-                                context,
-                                result.message(context),
-                                Toast.LENGTH_LONG,
-                            ).show()
+                        when (result) {
+                            is KimiWebLaunchResult.Opened -> {
+                                if (Prefs.isEnabled(Prefs.Keys.KIMI_WEB_USE_BUILTIN_BROWSER)) {
+                                    AgentBrowserSession.navigateFromUser(context.applicationContext, result.url)
+                                    pushRoute(AppRoute.Browser)
+                                }
+                            }
+                            is KimiWebLaunchResult.Failed -> {
+                                Toast.makeText(
+                                    context,
+                                    result.message(context),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
                         }
                     }
                 } else {

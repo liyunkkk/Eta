@@ -128,6 +128,8 @@ internal class AgentLocalTools(
             LinuxEnvironmentSettingsRepository.current(context).terminalEnvironment
         },
     )
+    private val selfConfigTool = AssistantSelfConfigTool(context)
+    private val kimiCodeSubagentTool = KimiCodeSubagentTool(context, terminalController)
     private val publishedObservation = AtomicReference(PublishedObservation())
     private val runAvailableSkillIds = runAvailableSkillIds
         .mapTo(mutableSetOf(), SkillParser::normalizeSkillLookup)
@@ -212,6 +214,9 @@ internal class AgentLocalTools(
                 "skills_list_curated" -> textResult(skillsListCurated())
                 "skills_inspect_github" -> textResult(skillsInspectGitHub(args))
                 "skills_install_from_github" -> textResult(skillsInstallFromGitHub(args))
+                "get_assistant_config" -> textResult(selfConfigTool.getAssistantConfig())
+                "update_assistant_config" -> textResult(selfConfigTool.updateAssistantConfig(args))
+                "delegate_to_kimi_code" -> textResult(kimiCodeSubagentTool.delegate(args))
                 else -> textResult(
                     errorResult(
                         code = "UNKNOWN_TOOL",
