@@ -129,6 +129,18 @@ internal class AgentTaskManager private constructor(
     }
 
     /**
+     * 快捷追加单条任务（自动提取标题）
+     */
+    suspend fun enqueueTask(
+        conversationId: String,
+        prompt: String,
+    ): String = enqueueTask(
+        conversationId = conversationId,
+        title = prompt.take(24).lines().firstOrNull()?.trim().orEmpty().ifBlank { "任务" },
+        prompt = prompt,
+    )
+
+    /**
      * 批量追加任务
      */
     suspend fun enqueueTasks(

@@ -2701,14 +2701,12 @@ internal class AgentAppState(
             taskManager.enqueueTask(conversationId = conversationId, prompt = taskText)
         }
     }
-
     fun steerActiveTask(instruction: String) {
         val conversationId = selectedConversationId ?: return
         scope.launch {
-            taskManager.steerOrEnqueue(conversationId = conversationId, instruction = instruction)
+            taskManager.steerOrEnqueue(conversationId = conversationId, text = instruction)
         }
     }
-
     fun deleteTask(taskId: String) {
         scope.launch {
             taskManager.deleteTask(taskId)

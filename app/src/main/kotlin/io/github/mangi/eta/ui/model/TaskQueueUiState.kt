@@ -37,6 +37,8 @@ data class TaskQueueUiState(
     val historyTasks: List<TaskItemUi> = emptyList(),
 ) {
     val isIdle: Boolean get() = runningCount == 0 && pendingCount == 0
+    val hasTasks: Boolean
+        get() = totalCount > 0 || activeTask != null || pendingTasks.isNotEmpty() || historyTasks.isNotEmpty()
     val summaryBadge: String
         get() = "$totalCount | ✓$completedCount ⟳$runningCount" + if (failedCount > 0) " ⚠$failedCount" else ""
 }
