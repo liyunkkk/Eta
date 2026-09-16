@@ -505,8 +505,9 @@ private fun BoxScope.AssistantPanel(
     )
     var isTaskDashboardExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(imeOverlapPx > 0) {
-        if (imeOverlapPx > 0 && isTaskDashboardExpanded) {
-            isTaskDashboardExpanded = false
+        if (imeOverlapPx > 0) {
+            if (isTaskDashboardExpanded) isTaskDashboardExpanded = false
+            if (state.isHistoryMenuVisible) onToggleHistoryMenu()
         }
     }
     val currentAnimatedHeight = rememberUpdatedState(animatedHeightPx)
@@ -517,7 +518,11 @@ private fun BoxScope.AssistantPanel(
         val historyExtra = if (state.isHistoryMenuVisible) 180.dp else 0.dp
         (base + taskExtra + historyExtra).toPx()
     }
-    val maxAvailableForSheetPx = (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
+    val maxAvailableForSheetPx = if (imeOverlapPx > 0) {
+        (maxContentHeightPx - imeOverlapPx - composerReservedHeightPx).coerceAtLeast(0f)
+    } else {
+        maxContentHeightPx
+    }
     val visibleSheetHeightPx = sheetHeightPx.coerceAtMost(maxAvailableForSheetPx)
     val nearFullscreen = sheetHeightPx >= maxContentHeightPx * 0.88f
     val handoffReady = canOpenConversation && nearFullscreen &&
@@ -588,10 +593,14 @@ private fun BoxScope.AssistantPanel(
             canOpenConversation && current >= maxContentHeightPx * 0.88f &&
                 (handoffReady || velocityY <= -handoffVelocityPx) -> triggerHandoff()
             else -> {
-                val medium = baseContentHeightPx +
-                    (maxContentHeightPx - baseContentHeightPx) * 0.58f
-                val anchors = floatArrayOf(baseContentHeightPx, medium, maxContentHeightPx)
-                settledHeightPx = anchors.minBy { kotlin.math.abs(it - current) }
+                val threshold = baseContentHeightPx +
+                    (maxContentHeightPx - baseContentHeightPx) * 0.42f
+                settledHeightPx = when {
+                    velocityY < -350f -> maxContentHeightPx
+                    velocityY > 350f -> baseContentHeightPx
+                    current >= threshold -> maxContentHeightPx
+                    else -> baseContentHeightPx
+                }
                 draggedHeightPx = null
                 dismissPullPx = 0f
                 handoffPullPx = 0f
@@ -670,6 +679,11 @@ private fun BoxScope.AssistantPanel(
             .heightIn(max = with(density) { (maxContentHeightPx + bottomInsetPx).toDp() })
             .offset(y = with(density) { sheetTranslationPx.toDp() })
             .clip(sheetShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            )
             .drawBehind {
                 val glassBrush = Brush.verticalGradient(
                     colors = listOf(
@@ -700,19 +714,21 @@ private fun BoxScope.AssistantPanel(
                     .height(with(density) { visibleSheetHeightPx.toDp() })
                     .nestedScroll(nestedScrollConnection),
             ) {
-                DragHandle(
-                    colors = colors,
-                    modifier = Modifier.pointerInput(baseContentHeightPx, maxContentHeightPx) {
-                        detectVerticalDragGestures(
-                            onDragStart = { draggedHeightPx = currentAnimatedHeight.value },
-                            onVerticalDrag = { change, dragAmount ->
-                                change.consume()
-                                dragBy(dragAmount)
-                            },
-                            onDragEnd = { finishDrag() },
-                            onDragCancel = { finishDrag() },
-                        )
-                    },
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .pointerInput(baseContentHeightPx, maxContentHeightPx) {
+                            detectVerticalDragGestures(
+                                onDragStart = { draggedHeightPx = currentAnimatedHeight.value },
+                                onVerticalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    dragBy(dragAmount)
+                                },
+                                onDragEnd = { finishDrag() },
+                                onDragCancel = { finishDrag() },
+                            )
+                        },
                 )
                 Box(
                     modifier = Modifier
@@ -751,18 +767,34 @@ private fun BoxScope.AssistantPanel(
                     .padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
+        val keyboard = LocalSoftwareKeyboardController.current
         AssistantComposer(
             state = state,
             input = input,
             colors = colors,
             focusRequester = focusRequester,
             isTaskDashboardExpanded = isTaskDashboardExpanded,
-            onToggleTaskDashboard = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
+            onToggleTaskDashboard = {
+                val next = !isTaskDashboardExpanded
+                isTaskDashboardExpanded = next
+                if (next) {
+                    keyboard?.hide()
+                    if (state.isHistoryMenuVisible) {
+                        onToggleHistoryMenu()
+                    }
+                }
+            },
             onInputChange = onInputChange,
             onScreenContextSelect = onScreenContextSelect,
             onScreenContextRemove = onScreenContextRemove,
             onScreenTranslation = onScreenTranslation,
-            onToggleHistoryMenu = onToggleHistoryMenu,
+            onToggleHistoryMenu = {
+                keyboard?.hide()
+                if (isTaskDashboardExpanded) {
+                    isTaskDashboardExpanded = false
+                }
+                onToggleHistoryMenu()
+            },
             onNewConversation = onNewConversation,
             onSubmit = onSubmit,
             onStop = onStop,
@@ -843,11 +875,6 @@ private fun AssistantComposer(
                 enabled = state.phase != EtaVoicePhase.PROCESSING,
                 colors = colors,
                 onClick = onToggleHistoryMenu,
-            )
-            NewConversationCapsule(
-                enabled = state.phase != EtaVoicePhase.PROCESSING,
-                colors = colors,
-                onClick = onNewConversation,
             )
             ScreenContextAttachment(
                 state = state.screenContext,

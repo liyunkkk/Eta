@@ -1188,6 +1188,9 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     historyConversations = items,
                 )
             } else {
+                val newId = "conv-${UUID.randomUUID()}"
+                currentConversationId = newId
+                io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(this@EtaAssistantOverlayService).bindConversation(newId)
                 val items = recent.map { meta ->
                     AssistantConversationItem(
                         id = meta.id,
@@ -1197,6 +1200,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     )
                 }
                 uiState = uiState.copy(
+                    conversationId = newId,
                     historyConversations = items,
                 )
             }
@@ -1271,12 +1275,14 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
 
     private fun newConversation() {
         cancelCurrentRun()
-        currentConversationId = null
+        val newId = "conv-${UUID.randomUUID()}"
+        currentConversationId = newId
+        io.github.mangi.eta.agent.task.AgentTaskManager.getInstance(this@EtaAssistantOverlayService).bindConversation(newId)
         conversationHistory = emptyList()
         inputText = ""
         uiState = uiState.copy(
             messages = emptyList(),
-            conversationId = null,
+            conversationId = newId,
             conversationTitle = "",
             isHistoryMenuVisible = false,
             historyConversations = uiState.historyConversations.map { it.copy(isCurrent = false) },

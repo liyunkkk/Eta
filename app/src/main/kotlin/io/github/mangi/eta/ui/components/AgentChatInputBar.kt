@@ -13,6 +13,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -246,7 +247,16 @@ internal fun AgentChatInputBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 36.dp)
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            runCatching {
+                                focusRequester.requestFocus()
+                                keyboard?.show()
+                            }
+                        },
                     contentAlignment = Alignment.TopStart,
                 ) {
                     if (textFieldState.text.isBlank()) {
