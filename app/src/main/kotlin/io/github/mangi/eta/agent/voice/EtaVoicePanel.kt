@@ -240,29 +240,29 @@ private fun rememberEtaVoicePanelColors(): EtaVoicePanelColors {
     return remember(dark) {
         if (dark) {
             EtaVoicePanelColors(
-                content = Color(0xD91E2024),
-                contentGradientEnd = Color(0xC4121316),
-                borderHighlight = Color(0x38FFFFFF),
-                input = Color(0x2EFFFFFF),
-                inputBorder = Color(0x24FFFFFF),
+                content = Color(0x8C1C1F26),
+                contentGradientEnd = Color(0x70111317),
+                borderHighlight = Color(0x40FFFFFF),
+                input = Color(0x33FFFFFF),
+                inputBorder = Color(0x20FFFFFF),
                 inputPrimary = Color(0xF0FFFFFF),
                 inputSecondary = Color(0x99FFFFFF),
                 inputTertiary = Color(0x4DFFFFFF),
                 tertiary = Color(0x55FFFFFF),
-                scrim = Color(0x66000000),
+                scrim = Color(0x4D000000),
             )
         } else {
             EtaVoicePanelColors(
-                content = Color(0xEBFFFFFF),
-                contentGradientEnd = Color(0xD9F0F3F8),
-                borderHighlight = Color(0xB3FFFFFF),
-                input = Color(0xB8FFFFFF),
-                inputBorder = Color(0x66FFFFFF),
+                content = Color(0x8AFFFFFF),
+                contentGradientEnd = Color(0x66EFF3F8),
+                borderHighlight = Color(0x99FFFFFF),
+                input = Color(0x4DFFFFFF),
+                inputBorder = Color(0x38FFFFFF),
                 inputPrimary = Color(0xE6111318),
                 inputSecondary = Color(0x8A2A2D35),
                 inputTertiary = Color(0x422A2D35),
                 tertiary = Color(0x38000000),
-                scrim = Color(0x38000000),
+                scrim = Color(0x20000000),
             )
         }
     }
@@ -624,25 +624,21 @@ private fun BoxScope.AssistantPanel(
                 if (
                     available.y < 0f &&
                     canOpenConversation &&
-                    current >= maxContentHeightPx * 0.88f
+                    current >= maxContentHeightPx * 0.95f
                 ) {
                     directHandoffPullPx += -available.y
                     if (directHandoffPullPx >= directHandoffThresholdPx) {
                         triggerHandoff()
                     }
-                    // 第二段上滑由父容器在 pre-scroll 阶段完整消费，避免列表或
-                    // overscroll 先截走事件后，接管手势永远达不到阈值。
                     return Offset(0f, available.y)
                 }
-                val shouldResize = (available.y < 0f && current < maxContentHeightPx) ||
-                    (available.y > 0f && current > baseContentHeightPx && !listState.canScrollBackward)
-                return if (shouldResize) {
-                    Offset(0f, dragByState.value(available.y))
-                } else {
-                    Offset.Zero
+                // 全屏展开且列表到顶时，向下拉才允许在 preScroll 缩回半屏
+                if (available.y > 0f && current > baseContentHeightPx && !listState.canScrollBackward) {
+                    return Offset(0f, dragByState.value(available.y))
                 }
+                // 正常浏览历史：完全不拦截，交给 LazyColumn
+                return Offset.Zero
             }
-
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
@@ -650,27 +646,32 @@ private fun BoxScope.AssistantPanel(
             ): Offset {
                 if (available.y == 0f) return Offset.Zero
                 val current = draggedHeightPx ?: currentAnimatedHeight.value
-                val atUpperEdge = available.y < 0f && current >= maxContentHeightPx * 0.88f
-                val atLowerEdge = available.y > 0f && current <= baseContentHeightPx
-                return if (atUpperEdge || atLowerEdge) {
-                    Offset(0f, dragByState.value(available.y))
-                } else {
-                    Offset.Zero
+                if (available.y < 0f && current < maxContentHeightPx && !listState.canScrollForward) {
+                    return Offset(0f, dragByState.value(available.y))
                 }
+                if (available.y > 0f && !listState.canScrollBackward) {
+                    return Offset(0f, dragByState.value(available.y))
+                }
+                return Offset.Zero
             }
-
             override suspend fun onPreFling(available: Velocity): Velocity {
-                finishDragState.value(available.y)
+                if (draggedHeightPx != null || dismissPullPx > 0f || handoffPullPx > 0f) {
+                    finishDragState.value(available.y)
+                    return available
+                }
                 return Velocity.Zero
             }
-
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (available.y < -400f && !listState.canScrollForward) {
+                    settledHeightPx = maxContentHeightPx
+                } else if (available.y > 400f && !listState.canScrollBackward) {
+                    settledHeightPx = baseContentHeightPx
+                }
                 finishDragState.value(available.y)
                 return Velocity.Zero
             }
         }
     }
-
     val bottomInset = with(density) { bottomInsetPx.toDp() }
     val messageRevealOffsetPx = with(density) { 12.dp.toPx() }
     val sheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
@@ -687,25 +688,26 @@ private fun BoxScope.AssistantPanel(
                 onClick = {},
             )
             .drawBehind {
+                val bgAlpha = sheetBackgroundAlpha.value
                 val glassBrush = Brush.verticalGradient(
                     colors = listOf(
-                        colors.content.copy(alpha = colors.content.alpha * sheetBackgroundAlpha.value),
-                        colors.contentGradientEnd.copy(alpha = colors.contentGradientEnd.alpha * sheetBackgroundAlpha.value),
+                        colors.content.copy(alpha = colors.content.alpha * bgAlpha),
+                        colors.contentGradientEnd.copy(alpha = colors.contentGradientEnd.alpha * bgAlpha),
                     ),
                 )
                 drawRect(brush = glassBrush)
-                val specularBrush = Brush.verticalGradient(
+                val rimBrush = Brush.verticalGradient(
                     colors = listOf(
-                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * sheetBackgroundAlpha.value),
-                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * 0.25f * sheetBackgroundAlpha.value),
-                        Color.Transparent,
+                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * bgAlpha),
+                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * 0.45f * bgAlpha),
+                        colors.borderHighlight.copy(alpha = colors.borderHighlight.alpha * 0.2f * bgAlpha),
                     ),
                     startY = 0f,
-                    endY = 64.dp.toPx(),
+                    endY = size.height,
                 )
                 drawRect(
-                    brush = specularBrush,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
+                    brush = rimBrush,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2.dp.toPx()),
                 )
             },
     ) {
@@ -719,7 +721,7 @@ private fun BoxScope.AssistantPanel(
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(14.dp)
+                        .height(18.dp)
                         .pointerInput(baseContentHeightPx, maxContentHeightPx) {
                             detectVerticalDragGestures(
                                 onDragStart = { draggedHeightPx = currentAnimatedHeight.value },
