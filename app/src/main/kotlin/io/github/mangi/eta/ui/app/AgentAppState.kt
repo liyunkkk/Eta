@@ -735,8 +735,7 @@ internal class AgentAppState(
     private fun syncConversationFromStore(conversationId: String) {
         scope.launch(Dispatchers.IO) {
             val loaded = AgentConversationStore.loadAssistantConversation(appContext, conversationId) ?: return@launch
-            val dbTime = EtaDatabase.get(appContext).conversationDao().conversationMetadata(conversationId)?.updatedAt
-                ?: System.currentTimeMillis()
+            val dbTime = loaded.updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis()
             withContext(Dispatchers.Main.immediate) {
                 val existing = conversationsById[conversationId]
                 val updatedState = (existing ?: emptyChatState(defaultThinkingEnabled)).copy(

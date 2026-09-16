@@ -453,6 +453,7 @@ internal object AgentConversationStore {
         val title: String,
         val messages: List<AgentChatMessageUi>,
         val history: List<AgentModelClient.ConversationMessage>,
+        val updatedAt: Long = 0L,
     )
 
     suspend fun loadAssistantConversation(context: Context, conversationId: String? = null): AssistantConversationData? {
@@ -487,6 +488,7 @@ internal object AgentConversationStore {
             title = metadata.title.takeUnless { it == LEGACY_UNNAMED_TITLE }.orEmpty(),
             messages = messages,
             history = history,
+            updatedAt = metadata.updatedAt,
         )
     }
 
