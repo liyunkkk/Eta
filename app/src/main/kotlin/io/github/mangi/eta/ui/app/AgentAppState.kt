@@ -168,7 +168,7 @@ internal class AgentAppState(
     init {
         refreshConversationSummaries()
         observeRuntimeSelection()
-        val initialId = ensureSelectedConversationId()
+        selectedConversationId?.let { taskManager.bindConversation(it) }
         scope.launch {
             taskManager.uiState.collectLatest { queueState ->
                 val currentId = selectedConversationId ?: return@collectLatest
