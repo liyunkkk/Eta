@@ -389,7 +389,7 @@ internal object AgentConversationStore {
         val metadata = dao.conversationMetadata(targetId) ?: return null
         val messageEntities = dao.messagesPage(targetId, limit = 100, offset = 0)
             .sortedBy { it.sortIndex }
-        val messages = messageEntities.mapNotNull { it.toMessageOrNull() }
+        val messages = messageEntities.mapNotNull { it.toMessageOrNull() }.distinctBy { it.id }
         val checkpoint = dao.contextCheckpoint(targetId)
         val history = AgentConversationCodec.decodeTranscript(checkpoint?.historyJson)
             .ifEmpty {
@@ -429,7 +429,7 @@ internal object AgentConversationStore {
                 )
                 dao.insertConversationRow(conversationEntity)
                 dao.deleteMessagesForConversation(conversationId)
-                val messageEntities = messages.mapIndexedNotNull { index, msg ->
+                val messageEntities = messages.distinctBy { it.id }.mapIndexedNotNull { index, msg ->
                     msg.toEntityOrNull(conversationId, index)
                 }
                 dao.insertMessages(messageEntities)

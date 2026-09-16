@@ -762,9 +762,10 @@ internal class AgentAppState(
         }
         val alreadyImported = AgentRuntimeHistoryReducer.wasApplied(existingState, runId) ||
             existingState.messages.any {
-                it is AgentMessageUi &&
-                    (it.id == "assistant-$runId" || it.id.startsWith("assistant-$runId-")) &&
-                    !it.isStreaming
+                it.id == "user-$runId" ||
+                    it.id.startsWith("user-$runId-") ||
+                    it.id == "assistant-$runId" ||
+                    it.id.startsWith("assistant-$runId-")
             }
         if (alreadyImported) return runId
 
@@ -772,6 +773,12 @@ internal class AgentAppState(
             conversationTitles = conversationTitles + (conversationId to payload.title)
         }
         runConversationIds[runId] = conversationId
+        val cleanMessages = existingState.messages.filterNot {
+            it.id == "user-$runId" ||
+                it.id.startsWith("user-$runId-") ||
+                it.id == "assistant-$runId" ||
+                it.id.startsWith("assistant-$runId-")
+        }
         updateConversation(
             conversationId,
             existingState.copy(
@@ -780,7 +787,7 @@ internal class AgentAppState(
                 thinkingEnabled = archivedEffort.enablesReasoning,
                 reasoningEffort = archivedEffort,
                 pendingImages = emptyList(),
-                messages = existingState.messages +
+                messages = cleanMessages +
                     UserMessageUi(
                         id = "user-$runId",
                         content = payload.userText,

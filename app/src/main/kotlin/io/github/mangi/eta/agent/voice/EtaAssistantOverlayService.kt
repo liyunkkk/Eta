@@ -509,6 +509,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         val newTitle = uiState.conversationTitle.ifBlank { normalized.take(40) }
         activeRunId = UUID.randomUUID().toString()
         val runId = activeRunId ?: return
+        val cleanMessages = uiState.messages.filterNot { it.id == "user-$runId" }
         uiState = uiState.copy(
             conversationId = targetConvId,
             conversationTitle = newTitle,
@@ -518,7 +519,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             screenContext = EtaScreenContextStateReducer.consume(),
             pendingImages = emptyList(),
             pendingFileReferences = emptyList(),
-            messages = uiState.messages + UserMessageUi(
+            messages = cleanMessages + UserMessageUi(
                 id = "user-$runId",
                 content = runtimePrompt,
                 images = previewImages,
@@ -870,7 +871,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
             }
         }
         runMessageProjector.clearRun(runId)
-        return messages
+        return messages.distinctBy { it.id }
     }
 
     private fun String.assistantRound(runId: String): Int? {
@@ -1126,7 +1127,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     )
                 }
                 uiState = uiState.copy(
-                    messages = convData.messages,
+                    messages = convData.messages.distinctBy { it.id },
                     conversationId = convData.conversationId,
                     conversationTitle = convData.title,
                     historyConversations = items,
@@ -1199,7 +1200,7 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     }
                     inputText = ""
                     uiState = uiState.copy(
-                        messages = data.messages,
+                        messages = data.messages.distinctBy { it.id },
                         conversationId = data.conversationId,
                         conversationTitle = data.title,
                         historyConversations = items,

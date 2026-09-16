@@ -763,9 +763,8 @@ private sealed interface AgentTimelineEntry {
 
     data class Message(
         val message: AgentChatMessageUi,
-    ) : AgentTimelineEntry {
-        override val key: String = message.id
-    }
+        override val key: String = message.id,
+    ) : AgentTimelineEntry
 
     data class WorkProcess(
         override val key: String,
@@ -774,25 +773,41 @@ private sealed interface AgentTimelineEntry {
 }
 
 private fun List<AgentChatMessageUi>.toTimelineEntries(): List<AgentTimelineEntry> = buildList {
+    val uniqueMessages = this@toTimelineEntries.distinctBy { it.id }
+    val usedKeys = mutableSetOf<String>()
     val workMessages = mutableListOf<AgentChatMessageUi>()
+
+    fun ensureUniqueKey(candidateKey: String): String {
+        var key = candidateKey
+        var counter = 1
+        while (key in usedKeys) {
+            key = "${candidateKey}_$counter"
+            counter++
+        }
+        usedKeys.add(key)
+        return key
+    }
 
     fun flushWorkProcess() {
         if (workMessages.isEmpty()) return
+        val rawKey = "work-${workMessages.first().id}"
+        val uniqueKey = ensureUniqueKey(rawKey)
         add(
             AgentTimelineEntry.WorkProcess(
-                key = "work-${workMessages.first().id}",
+                key = uniqueKey,
                 messages = workMessages.toList(),
             )
         )
         workMessages.clear()
     }
 
-    this@toTimelineEntries.forEach { message ->
+    uniqueMessages.forEach { message ->
         if (message.isWorkProcessMessage()) {
             workMessages += message
         } else {
             flushWorkProcess()
-            add(AgentTimelineEntry.Message(message))
+            val uniqueKey = ensureUniqueKey(message.id)
+            add(AgentTimelineEntry.Message(message = message, key = uniqueKey))
         }
     }
     flushWorkProcess()
