@@ -1,5 +1,8 @@
 package io.github.mangi.eta.agent.tool
 
+import io.github.mangi.eta.data.model.memory.MemoryCard
+import io.github.mangi.eta.data.repository.StructuredMemoryRepository
+
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -206,6 +209,9 @@ internal class AgentLocalTools(
                 "list_directory" -> textResult(terminalTool { listDirectory(args) })
                 "memory_get" -> textResult(memoryGet(args))
                 "memory_write" -> textResult(memoryWrite(args))
+                "memory_card_save" -> textResult(memoryCardSave(args))
+                "memory_card_query" -> textResult(memoryCardQuery(args))
+                "memory_card_delete" -> textResult(memoryCardDelete(args))
                 "skills_list" -> textResult(skillsList(args))
                 "skills_read" -> textResult(skillsRead(args))
                 "skills_read_resource" -> textResult(skillsReadResource(args))
@@ -272,7 +278,7 @@ internal class AgentLocalTools(
     }
 
     private fun memoryToolPermissionError(toolName: String): AgentModelClient.ToolResult? {
-        if (toolName == "memory_write" && !memoryWritable) {
+        if ((toolName == "memory_write" || toolName == "memory_card_save" || toolName == "memory_card_delete") && !memoryWritable) {
             return AgentModelClient.ToolResult(
                 content = errorResult("REAL_MEMORY_READ_ONLY", "角色会话的现实记忆只读；剧情请使用角色记忆工具"),
                 sensitive = true,
@@ -340,6 +346,61 @@ internal class AgentLocalTools(
         }
     } catch (failure: AgentMemoryException) {
         errorResult(failure.code, failure.message ?: "记忆写入失败")
+    }
+
+
+    private fun memoryCardSave(args: JSONObject): String = try {
+        val title = args.getString("title")
+        val content = args.getString("content")
+        val space = args.optString("space", MemoryCard.DEFAULT_SPACE)
+        val tagsArr = args.optJSONArray("tags")
+        val tags = if (tagsArr != null) {
+            (0 until tagsArr.length()).mapNotNull { tagsArr.optString(it).takeIf(String::isNotBlank) }
+        } else emptyList()
+        val importance = args.optInt("importance", MemoryCard.DEFAULT_IMPORTANCE)
+        val repo = StructuredMemoryRepository(context)
+        val saved = repo.saveCard(title, content, space, tags, importance)
+        JSONObject()
+            .put("ok", true)
+            .put("id", saved.id)
+            .put("card", saved.toJsonObject())
+            .toString()
+    } catch (e: Exception) {
+        errorResult("SAVE_CARD_FAILED", e.message ?: "保存记忆卡片失败")
+    }
+
+    private fun memoryCardQuery(args: JSONObject): String = try {
+        val space = args.optString("space").takeIf(String::isNotBlank)
+        val tagsArr = args.optJSONArray("tags")
+        val tags = if (tagsArr != null) {
+            (0 until tagsArr.length()).mapNotNull { tagsArr.optString(it).takeIf(String::isNotBlank) }
+        } else null
+        val keyword = args.optString("keyword").takeIf(String::isNotBlank)
+        val limit = args.optInt("limit", 10)
+        val repo = StructuredMemoryRepository(context)
+        val cards = repo.queryCards(space, tags, keyword, limit)
+        val arr = JSONArray()
+        cards.forEach { arr.put(it.toJsonObject()) }
+        JSONObject()
+            .put("ok", true)
+            .put("count", cards.size)
+            .put("cards", arr)
+            .toString()
+    } catch (e: Exception) {
+        errorResult("QUERY_CARDS_FAILED", e.message ?: "检索记忆卡片失败")
+    }
+
+    private fun memoryCardDelete(args: JSONObject): String = try {
+        val id = args.getString("id")
+        val repo = StructuredMemoryRepository(context)
+        val deleted = repo.deleteCard(id)
+        JSONObject()
+            .put("ok", true)
+            .put("deleted", deleted)
+            .put("id", id)
+            .toString()
+    } catch (e: Exception) {
+        errorResult("DELETE_CARD_FAILED", e.message ?: "删除记忆卡片失败")
     }
 
     private fun browserUse(args: JSONObject, toolCallId: String): AgentModelClient.ToolResult {
@@ -1371,6 +1432,6 @@ internal class AgentLocalTools(
         val DEVICE_TOOL_NAMES =
             DEVICE_DIRECT_TOOL_NAMES + DEVICE_SENSITIVE_READ_TOOL_NAMES +
                 DEVICE_SENSITIVE_ACTION_TOOL_NAMES
-        val MEMORY_TOOL_NAMES = setOf("memory_get", "memory_write")
+        val MEMORY_TOOL_NAMES = setOf("memory_get", "memory_write", "memory_card_query", "memory_card_save", "memory_card_delete")
     }
 }

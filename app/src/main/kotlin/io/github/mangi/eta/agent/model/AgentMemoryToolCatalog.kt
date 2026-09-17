@@ -99,5 +99,57 @@ internal object AgentMemoryToolCatalog {
                         .put("required", JSONArray().put("mode").put("revision")),
                 ),
             )
+
+        // 结构化记忆卡片：检索
+        tools.put(
+            AgentToolSchema.function(
+                name = "memory_card_query",
+                description = "Query structured memory cards by space, tags, or keyword. Returns matching memory cards sorted by importance.",
+                parameters = JSONObject()
+                    .put("type", "object")
+                    .put(
+                        "properties",
+                        JSONObject()
+                            .put("space", JSONObject().put("type", "string").put("description", "Optional space filter"))
+                            .put("tags", JSONObject().put("type", "array").put("items", JSONObject().put("type", "string")).put("description", "Optional tags filter"))
+                            .put("keyword", JSONObject().put("type", "string").put("description", "Optional search keyword"))
+                            .put("limit", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 50).put("description", "Max results; default 10")),
+                    ),
+            ),
+        )
+        if (!writable) return
+        // 结构化记忆卡片：保存/更新
+        tools.put(
+            AgentToolSchema.function(
+                name = "memory_card_save",
+                description = "Save or update a structured memory card. Overwrites existing card if same title exists in same space.",
+                parameters = JSONObject()
+                    .put("type", "object")
+                    .put(
+                        "properties",
+                        JSONObject()
+                            .put("title", JSONObject().put("type", "string").put("description", "Title of the memory"))
+                            .put("content", JSONObject().put("type", "string").put("description", "Core content"))
+                            .put("space", JSONObject().put("type", "string").put("description", "Space name, default general"))
+                            .put("tags", JSONObject().put("type", "array").put("items", JSONObject().put("type", "string")).put("description", "Tags list"))
+                            .put("importance", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 5).put("description", "Importance 1-5; default 3")),
+                    )
+                    .put("required", JSONArray().put("title").put("content")),
+            ),
+        )
+        // 结构化记忆卡片：删除
+        tools.put(
+            AgentToolSchema.function(
+                name = "memory_card_delete",
+                description = "Delete a structured memory card by ID.",
+                parameters = JSONObject()
+                    .put("type", "object")
+                    .put(
+                        "properties",
+                        JSONObject().put("id", JSONObject().put("type", "string").put("description", "Card ID")),
+                    )
+                    .put("required", JSONArray().put("id")),
+            ),
+        )
     }
 }

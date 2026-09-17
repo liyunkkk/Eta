@@ -43,6 +43,9 @@ internal class AgentTraceFormatter {
             AgentConversationToolCatalog.READ_HISTORY -> "读取当前会话历史"
             "memory_get", "character_memory_get" -> summarizeMemoryGetArguments(toolCall.argumentsJson)
             "memory_write", "character_memory_write" -> summarizeMemoryWriteArguments(toolCall.argumentsJson)
+            "memory_card_query" -> "检索记忆卡片"
+            "memory_card_save" -> "保存记忆卡片"
+            "memory_card_delete" -> "删除记忆卡片"
             "skills_list" -> "查看技能列表"
             "skills_read" -> "读取技能"
             "skills_read_resource" -> "读取技能资源"
