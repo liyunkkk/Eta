@@ -180,8 +180,9 @@ class StructuredMemoryRepository(private val storageFile: File) {
     fun listSpaces(): List<String> {
         ensureLoaded()
         return lock.read {
-            val set = linkedSetOf("全部", "通用", "全局准则", "开发", "项目信息", "用户信息", "工作", "生活", "偏好")
-            cards.forEach { if (it.space.isNotBlank()) set.add(it.space) }
+            val set = linkedSetOf("全部")
+            val realSpaces = cards.map { it.space.trim() }.filter { it.isNotBlank() }.distinct()
+            set.addAll(realSpaces)
             set.toList()
         }
     }
@@ -314,7 +315,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
         if (markdownText.isBlank()) return 0
         ensureLoaded()
         val lines = markdownText.lines()
-        var currentSpace = "全局准则"
+        var currentSpace = "通用"
         var importedCount = 0
         val cardRegex1 = Regex("""^-\s*\[([^\|\]]+)(?:\|([^\]]*))?\]\s*([^:]+):\s*(.*)$""")
         val cardRegex2 = Regex("""^-\s*([^:]+):\s*(.*)$""")
@@ -323,7 +324,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
             val line = rawLine.trim()
             if (line.isEmpty() || line == "# 核心记忆") continue
             if (line.startsWith("## ")) {
-                currentSpace = line.substring(3).trim().ifBlank { "全局准则" }
+                currentSpace = line.substring(3).trim().ifBlank { "通用" }
                 continue
             }
             val match1 = cardRegex1.matchEntire(line)
@@ -332,7 +333,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
                 val tags = tagsStr.split(',').map { it.trim() }.filter { it.isNotEmpty() }
                 val spaceName = sp.trim().ifBlank { currentSpace }
                 val importance = when {
-                    spaceName == "开发" || spaceName == "全局准则" || title.contains("规范") || title.contains("准则") -> 5
+                    spaceName == "开发" || title.contains("规范") || title.contains("准则") -> 5
                     spaceName == "用户信息" || spaceName == "项目信息" -> 4
                     else -> 3
                 }
@@ -349,7 +350,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
             val match2 = cardRegex2.matchEntire(line)
             if (match2 != null) {
                 val (title, content) = match2.destructured
-                val importance = if (currentSpace == "开发" || currentSpace == "全局准则" || title.contains("规范")) 5 else 3
+                val importance = if (currentSpace == "开发" || title.contains("规范")) 5 else 3
                 saveCard(
                     title = title.trim(),
                     content = content.trim(),
@@ -379,8 +380,6 @@ class StructuredMemoryRepository(private val storageFile: File) {
                 val grouped = cards.groupBy { it.space }
                 val sortedSpaces = grouped.keys.sortedWith { a, b ->
                     when {
-                        a == "全局准则" -> -1
-                        b == "全局准则" -> 1
                         a == "开发" -> -1
                         b == "开发" -> 1
                         a == "通用" -> -1

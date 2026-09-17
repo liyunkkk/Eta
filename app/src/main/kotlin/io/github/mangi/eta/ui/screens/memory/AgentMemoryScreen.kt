@@ -180,8 +180,8 @@ internal fun AgentMemoryScreen(
                                     editDialogCard = MemoryCard(
                                         title = "",
                                         content = "",
-                                        space = if (state.selectedSpace != "全部") state.selectedSpace else "全局准则",
-                                        importance = if (state.selectedSpace == "全局准则") 5 else 3,
+                                        space = if (state.selectedSpace != "全部") state.selectedSpace else "通用",
+                                        importance = if (state.selectedSpace == "开发") 5 else 3,
                                     )
                                 },
                             ) {
@@ -294,16 +294,12 @@ internal fun AgentMemoryScreen(
                     ) {
                         state.spaces.forEach { space ->
                             val isSelected = space == state.selectedSpace
-                            val isRule = space == "全局准则"
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(percent = 50))
                                     .background(
-                                        when {
-                                            isSelected -> MiuixTheme.colorScheme.primary
-                                            isRule -> MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                            else -> MiuixTheme.colorScheme.surface
-                                        }
+                                        if (isSelected) MiuixTheme.colorScheme.primary
+                                        else MiuixTheme.colorScheme.surface
                                     )
                                     .clickable { onAction(AgentMemoryAction.SelectSpace(space)) }
                                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -313,11 +309,8 @@ internal fun AgentMemoryScreen(
                                     style = MiuixTheme.textStyles.footnote1.copy(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     ),
-                                    color = when {
-                                        isSelected -> MiuixTheme.colorScheme.onPrimary
-                                        isRule -> MiuixTheme.colorScheme.primary
-                                        else -> MiuixTheme.colorScheme.onSurface
-                                    },
+                                    color = if (isSelected) MiuixTheme.colorScheme.onPrimary
+                                    else MiuixTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -351,8 +344,8 @@ internal fun AgentMemoryScreen(
                                         editDialogCard = MemoryCard(
                                             title = "",
                                             content = "",
-                                            space = if (state.selectedSpace != "全部") state.selectedSpace else "全局准则",
-                                            importance = if (state.selectedSpace == "全局准则") 5 else 3,
+                                            space = if (state.selectedSpace != "全部") state.selectedSpace else "通用",
+                                            importance = if (state.selectedSpace == "开发") 5 else 3,
                                         )
                                     },
                                 )
@@ -362,7 +355,6 @@ internal fun AgentMemoryScreen(
                 } else {
                     items(filtered.size, key = { filtered[it].id }) { idx ->
                         val card = filtered[idx]
-                        val isRule = card.space == "全局准则"
 
                         Card(
                             modifier = Modifier
@@ -383,16 +375,13 @@ internal fun AgentMemoryScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(4.dp))
-                                                .background(
-                                                    if (isRule) Color(0xFFFF5722).copy(alpha = 0.15f)
-                                                    else MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                                )
+                                                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
                                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                                         ) {
                                             Text(
                                                 text = card.space,
                                                 style = MiuixTheme.textStyles.footnote1.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                                                color = if (isRule) Color(0xFFFF5722) else MiuixTheme.colorScheme.primary,
+                                                color = MiuixTheme.colorScheme.primary,
                                             )
                                         }
                                         Text(
@@ -509,7 +498,7 @@ internal fun AgentMemoryScreen(
                 TextField(
                     value = editSpace,
                     onValueChange = { editSpace = it },
-                    label = "分类空间 (如: 全局准则、用户信息、环境配置、偏好)",
+                    label = "分类空间 (如: 开发、项目信息、用户信息、偏好)",
                     useLabelAsPlaceholder = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
