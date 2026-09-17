@@ -92,8 +92,8 @@ import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.menu.DropdownEntry
-import top.yukonga.miuix.kmp.menu.DropdownItem
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.menu.OverlayIconDropdownMenu
 import top.yukonga.miuix.kmp.squircle.squircleSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -555,25 +555,11 @@ private fun BrowserToolbar(
                     items = listOfNotNull(
                         DropdownItem(
                             text = stringResource(R.string.browser_open_external),
-                            icon = { mod ->
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                    contentDescription = null,
-                                    modifier = mod.size(18.dp),
-                                )
-                            },
                             enabled = snapshot.available,
                             onClick = onOpenExternal,
                         ),
                         DropdownItem(
                             text = stringResource(R.string.browser_reset_session),
-                            icon = { mod ->
-                                Icon(
-                                    imageVector = Icons.Rounded.Delete,
-                                    contentDescription = null,
-                                    modifier = mod.size(18.dp),
-                                )
-                            },
                             enabled = snapshot.available && !actionPending,
                             onClick = onReset,
                         ),
