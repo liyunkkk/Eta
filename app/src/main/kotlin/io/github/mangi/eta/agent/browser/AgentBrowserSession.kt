@@ -266,7 +266,7 @@ internal object AgentBrowserSession {
         initialize(hostContext)
         val wasAlreadyControlling = userControlActive
         userControlActive = true
-        if (!wasAlreadyControlling) interruptCurrentAction(force = true)
+        if (!wasAlreadyControlling) interruptCurrentAction(force = false)
         runOnMain {
             attachedContainer?.takeIf { it !== container }?.removeAllViews()
             attachedContainer = container

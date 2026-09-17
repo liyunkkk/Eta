@@ -231,8 +231,10 @@ fun AgentAppRoot(
                         when (result) {
                             is KimiWebLaunchResult.Opened -> {
                                 if (Prefs.isEnabled(Prefs.Keys.KIMI_WEB_USE_BUILTIN_BROWSER)) {
-                                    AgentBrowserSession.navigateFromUser(context.applicationContext, result.url)
                                     pushRoute(AppRoute.Browser)
+                                    uiScope.launch(Dispatchers.IO) {
+                                        AgentBrowserSession.navigateFromUser(context.applicationContext, result.url)
+                                    }
                                 }
                             }
                             is KimiWebLaunchResult.Failed -> {

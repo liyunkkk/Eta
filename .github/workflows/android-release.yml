@@ -108,6 +108,8 @@ jobs:
           --tests io.github.mangi.eta.agent.model.ProviderRequestHeadersTest
           --tests io.github.mangi.eta.agent.model.ProviderUrlsTest
           --tests io.github.mangi.eta.ui.app.AgentConversationStoreTest
+          --tests io.github.mangi.eta.agent.tool.AgentToolRequirementsTest
+          --tests io.github.mangi.eta.agent.tool.AssistantConfigSanitizerTest
 
       - name: 构建 Debug APK
         run: >-

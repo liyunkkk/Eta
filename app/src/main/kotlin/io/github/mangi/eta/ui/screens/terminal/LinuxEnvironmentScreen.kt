@@ -48,6 +48,8 @@ import io.github.mangi.eta.agent.terminal.SharedFolderMounts
 import io.github.mangi.eta.agent.terminal.terminalEnvironment
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.repository.LinuxEnvironmentSettingsRepository
+import io.github.mangi.eta.agent.browser.AgentBrowserSession
+import io.github.mangi.eta.config.Prefs
 import io.github.mangi.eta.ui.app.KimiWebLaunchResult
 import io.github.mangi.eta.ui.app.KimiWebLauncher
 import io.github.mangi.eta.ui.app.launchForegroundExecution
@@ -284,8 +286,18 @@ internal fun LinuxEnvironmentScreen(
         coroutineScope.launch {
             val result = kimiWebLauncher.launch(selectedDistribution.terminalEnvironment)
             kimiWebLaunching = false
-            if (result is KimiWebLaunchResult.Failed) {
-                resultMessage = result.message(context)
+            when (result) {
+                is KimiWebLaunchResult.Opened -> {
+                    if (Prefs.isEnabled(Prefs.Keys.KIMI_WEB_USE_BUILTIN_BROWSER)) {
+                        onNavigate(AppRoute.Browser)
+                        withContext(Dispatchers.IO) {
+                            AgentBrowserSession.navigateFromUser(appContext, result.url)
+                        }
+                    }
+                }
+                is KimiWebLaunchResult.Failed -> {
+                    resultMessage = result.message(context)
+                }
             }
         }
     }

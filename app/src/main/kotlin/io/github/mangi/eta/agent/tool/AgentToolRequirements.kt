@@ -37,6 +37,7 @@ internal object AgentToolRequirements {
             "character_memory_get", "character_memory_write",
             "skills_list", "skills_read", "skills_read_resource", "skills_list_curated",
             "skills_inspect_github", "skills_install_from_github",
+            "get_assistant_config", "update_assistant_config", "delegate_to_kimi_code",
         )
         register(
             RootRequirement.PARTIAL,
