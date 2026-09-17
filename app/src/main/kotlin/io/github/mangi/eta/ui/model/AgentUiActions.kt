@@ -1,4 +1,5 @@
 package io.github.mangi.eta.ui.model
+import io.github.mangi.eta.data.model.memory.MemoryCard
 
 import io.github.mangi.eta.data.model.ReasoningEffort
 
@@ -95,7 +96,15 @@ sealed interface AgentMemoryAction {
     data object Save : AgentMemoryAction
     data object Clear : AgentMemoryAction
     data object DismissNotice : AgentMemoryAction
+    data class SelectSpace(val space: String) : AgentMemoryAction
+    data class SearchQueryChanged(val query: String) : AgentMemoryAction
+    data object OpenCreateCard : AgentMemoryAction
+    data class OpenEditCard(val card: MemoryCard) : AgentMemoryAction
+    data object DismissCardDialog : AgentMemoryAction
+    data class SaveCard(val card: MemoryCard) : AgentMemoryAction
     data class DeleteCard(val id: String) : AgentMemoryAction
+    data object ClearAllCards : AgentMemoryAction
+    data class ImportJson(val jsonString: String) : AgentMemoryAction
     data class ImportOperitJson(val jsonString: String) : AgentMemoryAction
     data object RefreshCards : AgentMemoryAction
 }

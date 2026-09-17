@@ -5,6 +5,7 @@ import io.github.mangi.eta.data.model.memory.MemoryCard
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -72,15 +73,21 @@ class StructuredMemoryRepository(private val storageFile: File) {
         val now = System.currentTimeMillis()
 
         return lock.write {
-            val existingIndex = cards.indexOfFirst {
-                it.space.equals(normalizedSpace, ignoreCase = true) &&
-                    it.title.equals(normalizedTitle, ignoreCase = true)
+            val existingIndex = if (!customId.isNullOrBlank()) {
+                cards.indexOfFirst { it.id == customId }
+            } else {
+                cards.indexOfFirst {
+                    it.space.equals(normalizedSpace, ignoreCase = true) &&
+                        it.title.equals(normalizedTitle, ignoreCase = true)
+                }
             }
 
             val savedCard = if (existingIndex >= 0) {
                 val existing = cards[existingIndex]
                 val merged = existing.copy(
+                    title = normalizedTitle,
                     content = content.trim(),
+                    space = normalizedSpace,
                     tags = if (normalizedTags.isNotEmpty()) normalizedTags else existing.tags,
                     importance = validImportance,
                     updatedAt = updatedAt ?: now,
@@ -89,7 +96,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
                 merged
             } else {
                 val newCard = MemoryCard(
-                    id = customId?.takeIf { it.isNotBlank() } ?: java.util.UUID.randomUUID().toString(),
+                    id = customId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
                     title = normalizedTitle,
                     content = content.trim(),
                     space = normalizedSpace,
@@ -120,17 +127,48 @@ class StructuredMemoryRepository(private val storageFile: File) {
         }
     }
 
-    fun listCards(space: String? = null): List<MemoryCard> {
+    fun clearAll(): Int {
+        ensureLoaded()
+        return lock.write {
+            val size = cards.size
+            cards.clear()
+            persistLocked()
+            size
+        }
+    }
+
+    fun listCards(space: String? = null, keyword: String? = null): List<MemoryCard> {
+        ensureLoaded()
+        val targetSpace = if (space.isNullOrBlank() || space == "全部") null else space.trim()
+        val targetKey = keyword?.trim()?.lowercase()?.takeIf(String::isNotEmpty)
+
+        return lock.read {
+            cards.asSequence()
+                .filter { card ->
+                    if (targetSpace != null && !card.space.equals(targetSpace, ignoreCase = true)) {
+                        return@filter false
+                    }
+                    if (targetKey != null) {
+                        val inTitle = card.title.lowercase().contains(targetKey)
+                        val inContent = card.content.lowercase().contains(targetKey)
+                        val inTags = card.tags.any { it.lowercase().contains(targetKey) }
+                        if (!inTitle && !inContent && !inTags) return@filter false
+                    }
+                    true
+                }
+                .sortedWith(
+                    compareByDescending<MemoryCard> { it.importance }.thenByDescending { it.updatedAt }
+                )
+                .toList()
+        }
+    }
+
+    fun listSpaces(): List<String> {
         ensureLoaded()
         return lock.read {
-            val filtered = if (space.isNullOrBlank()) {
-                cards
-            } else {
-                cards.filter { it.space.equals(space.trim(), ignoreCase = true) }
-            }
-            filtered.sortedWith(
-                compareByDescending<MemoryCard> { it.importance }.thenByDescending { it.updatedAt }
-            )
+            val set = linkedSetOf("全部", "通用", "用户信息", "工作", "生活", "开发", "偏好")
+            cards.forEach { if (it.space.isNotBlank()) set.add(it.space) }
+            set.toList()
         }
     }
 
@@ -141,7 +179,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
         limit: Int = 10,
     ): List<MemoryCard> {
         ensureLoaded()
-        val normalizedSpace = space?.trim()?.takeIf(String::isNotEmpty)
+        val normalizedSpace = if (space.isNullOrBlank() || space == "全部") null else space.trim()
         val targetTags = tags?.mapNotNull { it.trim().takeIf(String::isNotEmpty) }?.filter { it.isNotEmpty() }
         val targetKeyword = keyword?.trim()?.lowercase()?.takeIf(String::isNotEmpty)
 
@@ -172,20 +210,16 @@ class StructuredMemoryRepository(private val storageFile: File) {
         }
     }
 
-    fun toCompactPrompt(space: String? = null, limit: Int = 5): String {
-        val selectedCards = queryCards(space = space, limit = limit)
-        if (selectedCards.isEmpty()) return ""
-
-        return buildString {
-            selectedCards.forEach { card ->
-                val tagStr = if (card.tags.isNotEmpty()) "|" + card.tags.joinToString(",") else ""
-                val singleLineContent = card.content.replace("\n", " ").trim()
-                appendLine("- [${card.space}$tagStr] ${card.title}: $singleLineContent")
-            }
-        }.trimEnd()
+    fun exportJson(): String {
+        ensureLoaded()
+        return lock.read {
+            val arr = JSONArray()
+            cards.forEach { arr.put(it.toJsonObject()) }
+            arr.toString(2)
+        }
     }
 
-    fun importFromOperitJson(jsonString: String): Int {
+    fun importFromJson(jsonString: String): Int {
         if (jsonString.isBlank()) return 0
         ensureLoaded()
 
@@ -195,7 +229,10 @@ class StructuredMemoryRepository(private val storageFile: File) {
                 JSONArray(trimmed)
             } else {
                 val obj = JSONObject(trimmed)
-                obj.optJSONArray("memories") ?: JSONArray()
+                obj.optJSONArray("memories")
+                    ?: obj.optJSONArray("cards")
+                    ?: obj.optJSONArray("items")
+                    ?: JSONArray()
             }
         } catch (_: Exception) {
             return 0
@@ -252,5 +289,20 @@ class StructuredMemoryRepository(private val storageFile: File) {
         }
 
         return importedCount
+    }
+
+    fun importFromOperitJson(jsonString: String): Int = importFromJson(jsonString)
+
+    fun toCompactPrompt(space: String? = null, limit: Int = 5): String {
+        val selectedCards = queryCards(space = space, limit = limit)
+        if (selectedCards.isEmpty()) return ""
+
+        return buildString {
+            selectedCards.forEach { card ->
+                val tagStr = if (card.tags.isNotEmpty()) "|" + card.tags.joinToString(",") else ""
+                val singleLineContent = card.content.replace("\n", " ").trim()
+                appendLine("- [${card.space}$tagStr] ${card.title}: $singleLineContent")
+            }
+        }.trimEnd()
     }
 }

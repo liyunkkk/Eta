@@ -1343,37 +1343,105 @@ internal class AgentAppState(
         }
 
     
+    fun selectMemorySpace(space: String) {
+        memoryState = memoryState.copy(selectedSpace = space)
+    }
+
+    fun updateMemorySearchQuery(query: String) {
+        memoryState = memoryState.copy(searchQuery = query)
+    }
+
+    fun openCreateMemoryCard() {
+        memoryState = memoryState.copy(isCreatingNewCard = true, editingCard = null)
+    }
+
+    fun openEditMemoryCard(card: io.github.mangi.eta.data.model.memory.MemoryCard) {
+        memoryState = memoryState.copy(isCreatingNewCard = false, editingCard = card)
+    }
+
+    fun dismissMemoryCardDialog() {
+        memoryState = memoryState.copy(isCreatingNewCard = false, editingCard = null)
+    }
+
+    fun saveMemoryCard(card: io.github.mangi.eta.data.model.memory.MemoryCard) {
+        scope.launch(Dispatchers.IO) {
+            val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+            repo.saveCard(
+                title = card.title,
+                content = card.content,
+                space = card.space,
+                tags = card.tags,
+                importance = card.importance,
+                customId = card.id,
+            )
+            val updatedCards = repo.listCards()
+            val updatedSpaces = repo.listSpaces()
+            withContext(Dispatchers.Main) {
+                memoryState = memoryState.copy(
+                    cards = updatedCards,
+                    spaces = updatedSpaces,
+                    isCreatingNewCard = false,
+                    editingCard = null,
+                    notice = "记忆卡片已保存"
+                )
+            }
+        }
+    }
+
     fun deleteMemoryCard(id: String) {
         scope.launch(Dispatchers.IO) {
             val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
             repo.deleteCard(id)
             val updatedCards = repo.listCards()
+            val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
-                memoryState = memoryState.copy(cards = updatedCards)
+                memoryState = memoryState.copy(cards = updatedCards, spaces = updatedSpaces)
             }
         }
     }
 
-    fun importOperitJson(jsonString: String) {
+    fun clearAllMemoryCards() {
         scope.launch(Dispatchers.IO) {
             val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
-            val count = repo.importFromOperitJson(jsonString)
+            val count = repo.clearAll()
             val updatedCards = repo.listCards()
+            val updatedSpaces = repo.listSpaces()
+            withContext(Dispatchers.Main) {
+                memoryState = memoryState.copy(cards = updatedCards, spaces = updatedSpaces, notice = "已清空 " + str(count) + " 条记忆卡片")
+            }
+        }
+    }
+
+    fun importMemoryJson(jsonString: String) {
+        scope.launch(Dispatchers.IO) {
+            val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+            val count = repo.importFromJson(jsonString)
+            val updatedCards = repo.listCards()
+            val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
                 memoryState = memoryState.copy(
                     cards = updatedCards,
-                    notice = if (count > 0) "成功导入 $count 条记忆卡片" else "未能解析出有效记忆卡片"
+                    spaces = updatedSpaces,
+                    notice = if (count > 0) "成功导入 " + str(count) + " 条记忆卡片" else "未能解析出有效记忆卡片"
                 )
             }
         }
+    }
+
+    fun importOperitJson(jsonString: String) = importMemoryJson(jsonString)
+
+    fun exportMemoryJson(): String {
+        val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+        return repo.exportJson()
     }
 
     fun refreshMemoryCards() {
         scope.launch(Dispatchers.IO) {
             val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
             val updatedCards = repo.listCards()
+            val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
-                memoryState = memoryState.copy(cards = updatedCards)
+                memoryState = memoryState.copy(cards = updatedCards, spaces = updatedSpaces)
             }
         }
     }
