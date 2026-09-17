@@ -327,6 +327,7 @@ fun AgentAppRoot(
                                     agentState.removePendingFileReference(action.id)
                                 is AgentHomeAction.EditMessage -> agentState.beginMessageEdit(action.id)
                                 AgentHomeAction.CancelMessageEdit -> agentState.cancelMessageEdit()
+                                is AgentHomeAction.DeleteSingleMessage -> agentState.deleteSingleMessage(action.id)
                                 is AgentHomeAction.DeleteMessage -> {
                                     agentState.messageRevisionImpact(action.id)?.let { impact ->
                                         messageDeleteTarget = MessageMutationTarget(action.id, impact.laterTurnCount)
@@ -384,6 +385,7 @@ fun AgentAppRoot(
                                     agentState.removePendingFileReference(action.id)
                                 is AgentChatAction.EditMessage -> agentState.beginMessageEdit(action.id)
                                 AgentChatAction.CancelMessageEdit -> agentState.cancelMessageEdit()
+                                is AgentChatAction.DeleteSingleMessage -> agentState.deleteSingleMessage(action.id)
                                 is AgentChatAction.DeleteMessage -> {
                                     agentState.messageRevisionImpact(action.id)?.let { impact ->
                                         messageDeleteTarget = MessageMutationTarget(action.id, impact.laterTurnCount)
@@ -648,6 +650,9 @@ fun AgentAppRoot(
                             AgentMemoryAction.Save -> agentState.saveMemory()
                             AgentMemoryAction.Clear -> agentState.clearMemory()
                             AgentMemoryAction.DismissNotice -> agentState.dismissMemoryNotice()
+                            is AgentMemoryAction.DeleteCard -> agentState.deleteMemoryCard(action.id)
+                            is AgentMemoryAction.ImportOperitJson -> agentState.importOperitJson(action.jsonString)
+                            AgentMemoryAction.RefreshCards -> agentState.refreshMemoryCards()
                         }
                     },
                 )
@@ -764,27 +769,43 @@ fun AgentAppRoot(
     messageDeleteTarget?.let { target ->
         WindowDialog(
             show = true,
-            title = stringResource(R.string.conversation_delete_message_title),
+            title = "删除对话消息",
             summary = if (target.laterTurnCount == 0) {
-                stringResource(R.string.conversation_delete_message_body)
+                "确认删除本条消息？"
             } else {
-                pluralStringResource(
-                    R.plurals.conversation_delete_later_turns,
-                    target.laterTurnCount,
-                    target.laterTurnCount,
-                )
+                "您可以仅删除该条错误消息，或者同时清除其后的 ${target.laterTurnCount} 轮对话。"
             },
             onDismissRequest = { messageDeleteTarget = null },
         ) {
-            MiuixDialogActions(
-                confirmText = stringResource(R.string.action_delete),
-                destructive = true,
-                onCancel = { messageDeleteTarget = null },
-                onConfirm = {
-                    agentState.deleteMessageTurn(target.messageId)
-                    messageDeleteTarget = null
-                },
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(
+                    text = "取消",
+                    onClick = { messageDeleteTarget = null },
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    text = "仅删除本条",
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    onClick = {
+                        agentState.deleteSingleMessage(target.messageId)
+                        messageDeleteTarget = null
+                    },
+                    modifier = Modifier.weight(1.2f),
+                )
+                if (target.laterTurnCount > 0) {
+                    TextButton(
+                        text = "删除包含后续",
+                        onClick = {
+                            agentState.deleteMessageTurn(target.messageId)
+                            messageDeleteTarget = null
+                        },
+                        modifier = Modifier.weight(1.4f),
+                    )
+                }
+            }
         }
     }
 

@@ -17,6 +17,7 @@ sealed interface AgentHomeAction {
     data class EditMessage(val id: String) : AgentHomeAction
     data object CancelMessageEdit : AgentHomeAction
     data class DeleteMessage(val id: String) : AgentHomeAction
+    data class DeleteSingleMessage(val id: String) : AgentHomeAction
     data class RegenerateMessage(val id: String) : AgentHomeAction
     data class SelectReplyCandidate(val id: String, val index: Int) : AgentHomeAction
     data object OpenTools : AgentHomeAction
@@ -55,6 +56,7 @@ sealed interface AgentChatAction {
     data class EditMessage(val id: String) : AgentChatAction
     data object CancelMessageEdit : AgentChatAction
     data class DeleteMessage(val id: String) : AgentChatAction
+    data class DeleteSingleMessage(val id: String) : AgentChatAction
     data class RegenerateMessage(val id: String) : AgentChatAction
     data class SelectReplyCandidate(val id: String, val index: Int) : AgentChatAction
     data class EnqueueTask(val taskText: String) : AgentChatAction
@@ -93,4 +95,7 @@ sealed interface AgentMemoryAction {
     data object Save : AgentMemoryAction
     data object Clear : AgentMemoryAction
     data object DismissNotice : AgentMemoryAction
+    data class DeleteCard(val id: String) : AgentMemoryAction
+    data class ImportOperitJson(val jsonString: String) : AgentMemoryAction
+    data object RefreshCards : AgentMemoryAction
 }

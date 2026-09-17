@@ -1,4 +1,12 @@
 package io.github.mangi.eta.ui.screens.memory
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+
 import io.github.mangi.eta.R
 import androidx.compose.ui.res.stringResource
 
@@ -92,6 +100,43 @@ internal fun AgentMemoryScreen(
                             title = stringResource(R.string.ui_core_memory_injection_budget_48b5d5),
                             summary = stringResource(R.string.memory_budget_summary, formatNumber(state.coreBudgetChars)),
                         )
+                        ArrowPreference(
+                            title = "导入 Operit 记忆备份",
+                            summary = "扫描并导入 Operit 历史记忆卡片",
+                            onClick = {
+                                val candidates = listOf(
+                                    java.io.File("/storage/emulated/0/Download/Operit/backup/memory/memory_backup_2026-08-15_18-44-19.json"),
+                                    java.io.File("/workspace/EtaWorker/Eta/参考文档/operit_memory_backup.json"),
+                                )
+                                val target = candidates.firstOrNull { it.exists() }
+                                if (target != null) {
+                                    onAction(AgentMemoryAction.ImportOperitJson(target.readText(Charsets.UTF_8)))
+                                }
+                            }
+                        )
+                    }
+                }
+                item(key = "cards-title") { SmallTitle("结构化记忆卡片 (${state.cards.size})") }
+                items(state.cards.size, key = { state.cards[it].id }) { i ->
+                    val card = state.cards[i]
+                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(text = "[${card.space}]", style = MiuixTheme.textStyles.footnote1, color = MiuixTheme.colorScheme.primary)
+                                    Text(text = card.title, style = MiuixTheme.textStyles.headline2, maxLines = 1)
+                                }
+                                IconButton(onClick = { onAction(AgentMemoryAction.DeleteCard(card.id)) }) {
+                                    Icon(imageVector = Icons.Rounded.Delete, contentDescription = "删除卡片", modifier = Modifier.size(16.dp), tint = MiuixTheme.colorScheme.error)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = card.content, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurface)
+                        }
                     }
                 }
             }

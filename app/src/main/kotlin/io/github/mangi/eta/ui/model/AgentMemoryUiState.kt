@@ -1,4 +1,5 @@
 package io.github.mangi.eta.ui.model
+import io.github.mangi.eta.data.model.memory.MemoryCard
 
 import androidx.compose.runtime.Immutable
 import io.github.mangi.eta.data.repository.AgentMemoryStore
@@ -14,6 +15,8 @@ data class AgentMemoryUiState(
     val maxBytes: Int = AgentMemoryStore.MAX_FILE_BYTES,
     val coreBudgetChars: Int = 8_000,
     val notice: String? = null,
+    val cards: List<MemoryCard> = emptyList(),
+    val isImporting: Boolean = false,
 ) {
     val hasUnsavedChanges: Boolean get() = draft != savedContent
     val canSave: Boolean

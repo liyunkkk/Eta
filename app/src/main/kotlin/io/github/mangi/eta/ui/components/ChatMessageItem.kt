@@ -541,7 +541,7 @@ private fun UserMessageBubble(
                         )
                         MessageTooltipAction(
                             icon = Icons.Rounded.Delete,
-                            label = stringResource(R.string.ui_delete_3755f5),
+                            label = "删除该条",
                             onClick = {
                                 tooltipState.dismiss()
                                 onDelete()

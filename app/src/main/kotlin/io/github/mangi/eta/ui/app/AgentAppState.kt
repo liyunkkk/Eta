@@ -264,9 +264,12 @@ internal class AgentAppState(
                 val snapshot = AgentMemoryRepository.snapshot()
                 val enabled = AgentMemoryRepository.isEnabled()
                 val contextWindow = RuntimeConfigRepository.currentRuntimeConfig()?.contextWindow
-                Triple(snapshot, enabled, AgentMemoryContextBuilder.coreBudgetChars(contextWindow))
+                val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+                val cards = repo.listCards()
+                Triple(snapshot, Pair(enabled, AgentMemoryContextBuilder.coreBudgetChars(contextWindow)), cards)
             }.fold(
-                onSuccess = { (snapshot, enabled, coreBudget) ->
+                onSuccess = { (snapshot, pair, cards) ->
+                    val (enabled, coreBudget) = pair
                     withContext(Dispatchers.Main) {
                         memoryState = AgentMemoryUiState(
                             enabled = enabled,
@@ -275,6 +278,7 @@ internal class AgentAppState(
                             savedContent = snapshot.content,
                             draftBytes = snapshot.byteSize,
                             coreBudgetChars = coreBudget,
+                            cards = cards,
                         )
                     }
                 },
@@ -1338,7 +1342,60 @@ internal class AgentAppState(
             MessageRevisionImpact(laterTurnCount = boundary.laterTurnCount)
         }
 
-    fun deleteMessageTurn(messageId: String) {
+    
+    fun deleteMemoryCard(id: String) {
+        scope.launch(Dispatchers.IO) {
+            val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+            repo.deleteCard(id)
+            val updatedCards = repo.listCards()
+            withContext(Dispatchers.Main) {
+                memoryState = memoryState.copy(cards = updatedCards)
+            }
+        }
+    }
+
+    fun importOperitJson(jsonString: String) {
+        scope.launch(Dispatchers.IO) {
+            val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+            val count = repo.importFromOperitJson(jsonString)
+            val updatedCards = repo.listCards()
+            withContext(Dispatchers.Main) {
+                memoryState = memoryState.copy(
+                    cards = updatedCards,
+                    notice = if (count > 0) "成功导入 $count 条记忆卡片" else "未能解析出有效记忆卡片"
+                )
+            }
+        }
+    }
+
+    fun refreshMemoryCards() {
+        scope.launch(Dispatchers.IO) {
+            val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+            val updatedCards = repo.listCards()
+            withContext(Dispatchers.Main) {
+                memoryState = memoryState.copy(cards = updatedCards)
+            }
+        }
+    }
+
+    fun deleteSingleMessage(messageId: String) {
+        if (homeState.isStreaming || homeState.messageEdit != null) return
+        val conversationId = selectedConversationId ?: return
+        val updated = homeState.copy(
+            messages = homeState.messages.filterNot { it.id == messageId },
+            journal = homeState.journal.filterNot { it.messageId == messageId },
+            history = homeState.history.filterNot { it.messageId == messageId },
+            roleplayMessages = homeState.roleplayMessages.copy(
+                links = homeState.roleplayMessages.links - messageId,
+                revisions = homeState.roleplayMessages.revisions - messageId,
+            ),
+        )
+        updateConversation(conversationId, updated)
+        refreshConversationSummaries()
+        persistConversations()
+    }
+
+fun deleteMessageTurn(messageId: String) {
         if (homeState.isStreaming || homeState.messageEdit != null) return
         val conversationId = selectedConversationId ?: return
         if (homeState.roleplay != null && messageId.startsWith("greeting-")) {
