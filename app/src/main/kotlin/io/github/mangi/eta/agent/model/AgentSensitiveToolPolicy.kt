@@ -41,6 +41,9 @@ internal object AgentSensitiveToolPolicy {
         "set_setting",
         "memory_get",
         "memory_write",
+        "memory_card_query",
+        "memory_card_save",
+        "memory_card_delete",
         "character_memory_get",
         "character_memory_write",
     )
