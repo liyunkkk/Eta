@@ -664,10 +664,8 @@ internal fun AgentConversationMessages(
                             showBrowserShortcut = message is ToolActivityMessageUi &&
                                 message.toolName == "browser_use" &&
                                 message.id == currentBrowserMessageId,
-                            showCopyAction = message !is AgentMessageUi ||
-                                message.characterEditable || message.id in finalResultMessageIds,
-                            showMessageActions = message.id in finalResultMessageIds ||
-                                (message is AgentMessageUi && message.characterEditable),
+                            showCopyAction = true,
+                            showMessageActions = true,
                             messageActionsEnabled = messageActionsEnabled,
                             isEditing = message.id == editTargetMessageId,
                             onEditMessage = onEditMessage,
