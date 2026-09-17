@@ -748,7 +748,18 @@ internal class AgentAppState(
 
     private fun syncConversationFromStore(conversationId: String) {
         scope.launch(Dispatchers.IO) {
-            val loaded = AgentConversationStore.loadAssistantConversation(appContext, conversationId) ?: return@launch
+            val loaded = AgentConversationStore.loadAssistantConversation(appContext, conversationId)
+            if (loaded == null) {
+                withContext(Dispatchers.Main.immediate) {
+                    if (conversationsById.containsKey(conversationId)) {
+                        conversationsById = conversationsById - conversationId
+                        conversationTitles = conversationTitles - conversationId
+                        conversationUpdatedAt = conversationUpdatedAt - conversationId
+                        refreshConversationSummaries()
+                    }
+                }
+                return@launch
+            }
             val dbTime = loaded.updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis()
             withContext(Dispatchers.Main.immediate) {
                 val existing = conversationsById[conversationId]
@@ -1016,7 +1027,34 @@ internal class AgentAppState(
         }
         conversationPaneState = conversationPaneState.copy(selectedConversationId = selectedConversationId)
         refreshConversationSummaries()
-        persistConversations()
+        val selected = selectedConversationId
+        val conversations = conversationsById
+        val titles = conversationTitles
+        val timestamps = conversationUpdatedAt
+        synchronized(persistenceLock) {
+            val previous = persistenceJob
+            scope.async(Dispatchers.IO) {
+                try {
+                    previous?.join()
+                    AgentConversationStore.deleteConversation(appContext, conversationId)
+                    AgentConversationStore.save(
+                        context = appContext,
+                        selectedConversationId = selected,
+                        conversationsById = conversations,
+                        titles = titles,
+                        updatedAt = timestamps,
+                    )
+                    true
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (throwable: Throwable) {
+                    AndroidAgentLogger.error(
+                        "Agent conversation delete/persistence failed: type=${throwable.safeLogType()}"
+                    )
+                    false
+                }
+            }.also { persistenceJob = it }
+        }
     }
 
     fun renameConversation(conversationId: String, title: String) {

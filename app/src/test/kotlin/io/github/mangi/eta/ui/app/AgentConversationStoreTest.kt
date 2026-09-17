@@ -558,4 +558,70 @@ class AgentConversationStoreTest {
         assertEquals("浮窗提问", (loaded?.messages?.get(0) as UserMessageUi).content)
         assertEquals("浮窗回答", (loaded?.messages?.get(1) as AgentMessageUi).content)
     }
+
+    @Test
+    fun deletingConversationPermanentlyRemovesFromStoreAndPreventsRebirth() = runBlocking {
+        // 1. 初始化存入两个会话
+        val msg1 = UserMessageUi(id = "u1", content = "会话1内容")
+        val msg2 = UserMessageUi(id = "u2", content = "会话2内容")
+        AgentConversationStore.save(
+            context = context,
+            selectedConversationId = "conv-1",
+            conversationsById = mapOf(
+                "conv-1" to AgentChatHomeUiState(
+                    messages = listOf(msg1),
+                    input = "",
+                    isStreaming = false,
+                    thinkingEnabled = false,
+                ),
+                "conv-2" to AgentChatHomeUiState(
+                    messages = listOf(msg2),
+                    input = "",
+                    isStreaming = false,
+                    thinkingEnabled = false,
+                ),
+            ),
+            titles = mapOf("conv-1" to "会话1", "conv-2" to "会话2"),
+            updatedAt = mapOf("conv-1" to 100L, "conv-2" to 200L),
+        )
+
+        // 验证初始状态存入成功
+        val initialSnapshot = AgentConversationStore.load(context)
+        assertEquals(2, initialSnapshot.conversationsById.size)
+        assertTrue(initialSnapshot.conversationsById.containsKey("conv-1"))
+        assertTrue(initialSnapshot.conversationsById.containsKey("conv-2"))
+
+        // 2. 模拟 AgentAppState 加载并执行删除 conv-1
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        try {
+            val state = AgentAppState(context, testScope)
+            assertEquals(2, state.conversationPaneState.conversations.size)
+
+            state.deleteConversation("conv-1")
+
+            // 等待异步持久化完成
+            var retries = 0
+            while (retries < 20) {
+                val checkSnapshot = AgentConversationStore.load(context)
+                if (!checkSnapshot.conversationsById.containsKey("conv-1")) {
+                    break
+                }
+                kotlinx.coroutines.delay(50)
+                retries++
+            }
+
+            // 3. 核心断言：重新 load 必须不存在 conv-1
+            val reloaded = AgentConversationStore.load(context)
+            assertFalse("被删除的会话 conv-1 不应存在于持久化存储中", reloaded.conversationsById.containsKey("conv-1"))
+            assertEquals("conv-2", reloaded.selectedConversationId)
+            assertEquals(1, reloaded.conversationsById.size)
+
+            // 4. 模拟应用 ON_RESUME 触发 syncAllConversationsFromStore，验证绝不复活已删除的会话
+            state.syncAllConversationsFromStore()
+            kotlinx.coroutines.delay(100)
+            assertFalse("syncAllConversationsFromStore 后已删除的 conv-1 绝不应复活", state.conversationPaneState.conversations.any { it.id == "conv-1" })
+        } finally {
+            testScope.cancel()
+        }
+    }
 }

@@ -178,7 +178,17 @@ internal object AgentConversationStore {
         val appContext = context.applicationContext
         saveMutex.withLock {
             withContext(Dispatchers.IO) {
-                EtaDatabase.get(appContext).conversationDao().deleteSingleConversation(conversationId)
+                val dao = EtaDatabase.get(appContext).conversationDao()
+                dao.deleteSingleConversation(conversationId)
+                val currentState = dao.state()
+                if (currentState?.selectedConversationId == conversationId) {
+                    val nextSelected = dao.conversationMetadataPage(limit = 1, offset = 0).firstOrNull()?.id
+                    if (nextSelected != null) {
+                        dao.insertState(ConversationStateEntity(selectedConversationId = nextSelected))
+                    } else {
+                        dao.deleteState()
+                    }
+                }
             }
         }
         notifyConversationUpdated(conversationId)
