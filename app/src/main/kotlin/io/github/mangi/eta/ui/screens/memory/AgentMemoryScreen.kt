@@ -1,5 +1,8 @@
 package io.github.mangi.eta.ui.screens.memory
 
+import androidx.compose.foundation.layout.size
+
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.ui.unit.sp
