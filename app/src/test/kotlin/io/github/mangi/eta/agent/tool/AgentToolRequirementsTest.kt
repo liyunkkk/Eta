@@ -1,6 +1,7 @@
 package io.github.mangi.eta.agent.tool
 
 import io.github.mangi.eta.agent.model.AgentToolCatalog
+import io.github.mangi.eta.agent.roleplay.CharacterMemoryTools
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -13,8 +14,8 @@ class AgentToolRequirementsTest {
     @Test
     fun everyRegisteredToolHasExactlyOneRequirement() {
         val tools = catalog(root = true)
-        assertEquals(AgentToolRequirements.toolNames, tools.names())
-        assertEquals(tools.length(), tools.names().size)
+        assertEquals(AgentToolRequirements.toolNames, tools.names() + CharacterMemoryTools.NAMES)
+        assertEquals(tools.length() + CharacterMemoryTools.NAMES.size, (tools.names() + CharacterMemoryTools.NAMES).size)
         assertFalse(tools.toString().contains("rootRequirement"))
     }
 
