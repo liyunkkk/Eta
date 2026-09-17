@@ -339,7 +339,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
     fun syncToMarkdownMirror(context: Context) {
         val markdown = generateMarkdownMirror()
         try {
-            AgentMemoryRepository.replaceAll(context, markdown)
+            AgentMemoryRepository.replaceAll(markdown)
         } catch (_: Exception) {}
     }
 
