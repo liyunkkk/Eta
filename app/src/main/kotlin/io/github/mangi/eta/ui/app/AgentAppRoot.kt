@@ -783,34 +783,34 @@ fun AgentAppRoot(
             },
             onDismissRequest = { messageDeleteTarget = null },
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 TextButton(
-                    text = "取消",
-                    onClick = { messageDeleteTarget = null },
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    text = "仅删除本条",
+                    text = "仅删除本条消息",
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                     onClick = {
                         agentState.deleteSingleMessage(target.messageId)
                         messageDeleteTarget = null
                     },
-                    modifier = Modifier.weight(1.2f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 if (target.laterTurnCount > 0) {
                     TextButton(
-                        text = "删除包含后续",
+                        text = "删除本条及后续 (${target.laterTurnCount} 轮)",
                         onClick = {
                             agentState.deleteMessageTurn(target.messageId)
                             messageDeleteTarget = null
                         },
-                        modifier = Modifier.weight(1.4f),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                TextButton(
+                    text = "取消",
+                    onClick = { messageDeleteTarget = null },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
