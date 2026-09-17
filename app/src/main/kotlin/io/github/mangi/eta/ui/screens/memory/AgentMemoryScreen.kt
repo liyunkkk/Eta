@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -209,6 +210,15 @@ internal fun AgentMemoryScreen(
                                     imageVector = Icons.Rounded.FileUpload,
                                     contentDescription = "导出备份",
                                     tint = MiuixTheme.colorScheme.onSurface,
+                                )
+                            }
+                            IconButton(
+                                onClick = { onAction(AgentMemoryAction.SyncFromLegacyMd) },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Sync,
+                                    contentDescription = "从 MEMORY.md 重新合并同步",
+                                    tint = MiuixTheme.colorScheme.primary,
                                 )
                             }
                             IconButton(

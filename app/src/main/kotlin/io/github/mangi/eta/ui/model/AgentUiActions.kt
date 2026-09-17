@@ -107,4 +107,5 @@ sealed interface AgentMemoryAction {
     data class ImportJson(val jsonString: String) : AgentMemoryAction
     data class ImportOperitJson(val jsonString: String) : AgentMemoryAction
     data object RefreshCards : AgentMemoryAction
+    data object SyncFromLegacyMd : AgentMemoryAction
 }

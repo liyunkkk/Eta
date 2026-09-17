@@ -265,11 +265,16 @@ internal class AgentAppState(
                 val enabled = AgentMemoryRepository.isEnabled()
                 val contextWindow = RuntimeConfigRepository.currentRuntimeConfig()?.contextWindow
                 val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+                if (snapshot.content.isNotBlank()) {
+                    repo.importFromMarkdown(snapshot.content)
+                }
                 val cards = repo.listCards()
-                Triple(snapshot, Pair(enabled, AgentMemoryContextBuilder.coreBudgetChars(contextWindow)), cards)
+                val spaces = repo.listSpaces()
+                Triple(snapshot, Pair(enabled, AgentMemoryContextBuilder.coreBudgetChars(contextWindow)), Pair(cards, spaces))
             }.fold(
-                onSuccess = { (snapshot, pair, cards) ->
+                onSuccess = { (snapshot, pair, cardSpacePair) ->
                     val (enabled, coreBudget) = pair
+                    val (cards, spaces) = cardSpacePair
                     withContext(Dispatchers.Main) {
                         memoryState = AgentMemoryUiState(
                             enabled = enabled,
@@ -279,6 +284,7 @@ internal class AgentAppState(
                             draftBytes = snapshot.byteSize,
                             coreBudgetChars = coreBudget,
                             cards = cards,
+                            spaces = spaces,
                         )
                     }
                 },
@@ -1437,6 +1443,23 @@ internal class AgentAppState(
     fun exportMemoryJson(): String {
         val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
         return repo.exportJson()
+    }
+
+    fun syncFromLegacyMemoryMd() {
+        scope.launch(Dispatchers.IO) {
+            val snapshot = AgentMemoryRepository.snapshot()
+            val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
+            val count = if (snapshot.content.isNotBlank()) repo.importFromMarkdown(snapshot.content) else 0
+            val updatedCards = repo.listCards()
+            val updatedSpaces = repo.listSpaces()
+            withContext(Dispatchers.Main) {
+                memoryState = memoryState.copy(
+                    cards = updatedCards,
+                    spaces = updatedSpaces,
+                    notice = "已从 MEMORY.md 成功合并同步 $count 条记忆卡片"
+                )
+            }
+        }
     }
 
     fun refreshMemoryCards() {

@@ -667,6 +667,7 @@ fun AgentAppRoot(
                             is AgentMemoryAction.ImportJson -> agentState.importMemoryJson(action.jsonString)
                             is AgentMemoryAction.ImportOperitJson -> agentState.importOperitJson(action.jsonString)
                             AgentMemoryAction.RefreshCards -> agentState.refreshMemoryCards()
+                            AgentMemoryAction.SyncFromLegacyMd -> agentState.syncFromLegacyMemoryMd()
                         }
                     },
                 )

@@ -166,4 +166,30 @@ class StructuredMemoryRepositoryTest {
         assertTrue(mirror.contains("## 开发"))
         assertTrue(mirror.contains("- [开发|路径] 工作目录: 统一使用 /workspace/EtaWorker"))
     }
+
+    @Test
+    fun testImportFromMarkdown() {
+        val repo = createRepo()
+        val markdown = """
+        # 核心记忆
+
+        ## 开发
+        - [开发|规范,原子交付] 原子交付规范: 多项改动必须聚合为单一Commit提交构建
+
+        ## 项目信息
+        - [项目信息|小米13,LSPosed] LSPosed排查: 环境为KernelSU加NeoZygisk
+        """.trimIndent()
+
+        val count = repo.importFromMarkdown(markdown)
+        assertEquals(2, count)
+
+        val devCards = repo.queryCards(space = "开发")
+        assertEquals(1, devCards.size)
+        assertEquals("原子交付规范", devCards[0].title)
+        assertEquals(5, devCards[0].importance) // 规范自动升级 5 星
+
+        val projCards = repo.queryCards(space = "项目信息")
+        assertEquals(1, projCards.size)
+        assertEquals("LSPosed排查", projCards[0].title)
+    }
 }

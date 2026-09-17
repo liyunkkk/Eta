@@ -19,7 +19,21 @@ class StructuredMemoryRepository(private val storageFile: File) {
 
     constructor(context: Context) : this(
         File(context.applicationContext.filesDir, "structured_memories.json")
-    )
+    ) {
+        checkAndMigrateLegacyMemoryMd(context.applicationContext)
+    }
+
+    private fun checkAndMigrateLegacyMemoryMd(appContext: Context) {
+        try {
+            val legacyFile = File(appContext.filesDir, "memory/MEMORY.md")
+            if (legacyFile.exists()) {
+                val text = legacyFile.readText(Charsets.UTF_8)
+                if (text.isNotBlank()) {
+                    importFromMarkdown(text)
+                }
+            }
+        } catch (_: Exception) {}
+    }
 
     private fun ensureLoaded() {
         if (loaded) return
@@ -166,7 +180,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
     fun listSpaces(): List<String> {
         ensureLoaded()
         return lock.read {
-            val set = linkedSetOf("全部", "通用", "全局准则", "用户信息", "工作", "生活", "开发", "偏好")
+            val set = linkedSetOf("全部", "通用", "全局准则", "开发", "项目信息", "用户信息", "工作", "生活", "偏好")
             cards.forEach { if (it.space.isNotBlank()) set.add(it.space) }
             set.toList()
         }
@@ -294,6 +308,62 @@ class StructuredMemoryRepository(private val storageFile: File) {
     fun importFromOperitJson(jsonString: String): Int = importFromJson(jsonString)
 
     /**
+     * 解析 Markdown 核心记忆格式并无损合并转为卡片（兼容 MEMORY.md 原生格式）
+     */
+    fun importFromMarkdown(markdownText: String): Int {
+        if (markdownText.isBlank()) return 0
+        ensureLoaded()
+        val lines = markdownText.lines()
+        var currentSpace = "全局准则"
+        var importedCount = 0
+        val cardRegex1 = Regex("""^-\s*\[([^\|\]]+)(?:\|([^\]]*))?\]\s*([^:]+):\s*(.*)$""")
+        val cardRegex2 = Regex("""^-\s*([^:]+):\s*(.*)$""")
+
+        for (rawLine in lines) {
+            val line = rawLine.trim()
+            if (line.isEmpty() || line == "# 核心记忆") continue
+            if (line.startsWith("## ")) {
+                currentSpace = line.substring(3).trim().ifBlank { "全局准则" }
+                continue
+            }
+            val match1 = cardRegex1.matchEntire(line)
+            if (match1 != null) {
+                val (sp, tagsStr, title, content) = match1.destructured
+                val tags = tagsStr.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                val spaceName = sp.trim().ifBlank { currentSpace }
+                val importance = when {
+                    spaceName == "开发" || spaceName == "全局准则" || title.contains("规范") || title.contains("准则") -> 5
+                    spaceName == "用户信息" || spaceName == "项目信息" -> 4
+                    else -> 3
+                }
+                saveCard(
+                    title = title.trim(),
+                    content = content.trim(),
+                    space = spaceName,
+                    tags = tags,
+                    importance = importance,
+                )
+                importedCount++
+                continue
+            }
+            val match2 = cardRegex2.matchEntire(line)
+            if (match2 != null) {
+                val (title, content) = match2.destructured
+                val importance = if (currentSpace == "开发" || currentSpace == "全局准则" || title.contains("规范")) 5 else 3
+                saveCard(
+                    title = title.trim(),
+                    content = content.trim(),
+                    space = currentSpace,
+                    tags = emptyList(),
+                    importance = importance,
+                )
+                importedCount++
+            }
+        }
+        return importedCount
+    }
+
+    /**
      * 将全部记忆卡片自动生成一份格式优雅的 Markdown 镜像文本，用于底层 MEMORY.md 兼容
      */
     fun generateMarkdownMirror(): String {
@@ -305,12 +375,14 @@ class StructuredMemoryRepository(private val storageFile: File) {
                 appendLine("# 核心记忆")
                 appendLine()
 
-                // 优先展示全局准则，其余分类按字母顺序
+                // 优先展示全局准则、开发，其余分类按字母顺序
                 val grouped = cards.groupBy { it.space }
                 val sortedSpaces = grouped.keys.sortedWith { a, b ->
                     when {
                         a == "全局准则" -> -1
                         b == "全局准则" -> 1
+                        a == "开发" -> -1
+                        b == "开发" -> 1
                         a == "通用" -> -1
                         b == "通用" -> 1
                         else -> a.compareTo(b)
