@@ -408,7 +408,7 @@ fun AgentAppRoot(
             }
             entry<AppRoute.Browser>(swipeDismiss = swipeDismiss) {
                 RoutedShell(route = AppRoute.Browser) {
-                    AgentBrowserScreen()
+                    AgentBrowserScreen(onBack = { popRoute() })
                 }
             }
             entry<AppRoute.Terminal>(swipeDismiss = swipeDismiss) {

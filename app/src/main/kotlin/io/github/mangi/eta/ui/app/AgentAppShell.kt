@@ -98,7 +98,7 @@ fun AgentAppShell(
                 WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
             ),
             topBar = {
-                if (currentRoute !is AppRoute.Settings) {
+                if (currentRoute !is AppRoute.Settings && currentRoute !is AppRoute.Browser) {
                     TopBarBackdrop(backdrop) {
                         AgentTopBar(
                             route = currentRoute,
