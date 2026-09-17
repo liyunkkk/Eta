@@ -1407,7 +1407,7 @@ internal class AgentAppState(
             val updatedCards = repo.listCards()
             val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
-                memoryState = memoryState.copy(cards = updatedCards, spaces = updatedSpaces, notice = "已清空 " + str(count) + " 条记忆卡片")
+                memoryState = memoryState.copy(cards = updatedCards, spaces = updatedSpaces, notice = "已清空 $count 条记忆卡片")
             }
         }
     }
@@ -1422,7 +1422,7 @@ internal class AgentAppState(
                 memoryState = memoryState.copy(
                     cards = updatedCards,
                     spaces = updatedSpaces,
-                    notice = if (count > 0) "成功导入 " + str(count) + " 条记忆卡片" else "未能解析出有效记忆卡片"
+                    notice = if (count > 0) "成功导入 $count 条记忆卡片" else "未能解析出有效记忆卡片"
                 )
             }
         }
