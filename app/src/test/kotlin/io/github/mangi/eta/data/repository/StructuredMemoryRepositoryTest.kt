@@ -140,4 +140,30 @@ class StructuredMemoryRepositoryTest {
         assertEquals(1, ttsCards.size)
         assertEquals(5, ttsCards[0].importance)
     }
+
+    @Test
+    fun testGenerateMarkdownMirror() {
+        val repo = createRepo()
+        repo.saveCard(
+            title = "本地编译准则",
+            content = "严禁本地重型编译，走云端构建",
+            space = "全局准则",
+            tags = listOf("规范", "性能"),
+            importance = 5,
+        )
+        repo.saveCard(
+            title = "工作目录",
+            content = "统一使用 /workspace/EtaWorker",
+            space = "开发",
+            tags = listOf("路径"),
+            importance = 4,
+        )
+
+        val mirror = repo.generateMarkdownMirror()
+        assertTrue(mirror.startsWith("# 核心记忆"))
+        assertTrue(mirror.contains("## 全局准则"))
+        assertTrue(mirror.contains("- [全局准则|规范,性能] 本地编译准则: 严禁本地重型编译，走云端构建"))
+        assertTrue(mirror.contains("## 开发"))
+        assertTrue(mirror.contains("- [开发|路径] 工作目录: 统一使用 /workspace/EtaWorker"))
+    }
 }

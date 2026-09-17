@@ -27,7 +27,8 @@ internal class KimiCodeSubagentTool(
         }
 
         val projectPath = args.optString("project_path").trim().ifBlank { "/workspace" }
-        val timeoutSeconds = args.optInt("timeout_seconds", 120).coerceIn(10, 600)
+        // 默认放宽到 300 秒，允许最大 600 秒
+        val timeoutSeconds = args.optInt("timeout_seconds", 300).coerceIn(10, 600)
 
         // 1. 检查 Linux 环境就绪状态
         val distribution = LinuxEnvironmentSettingsRepository.current(context)
@@ -59,7 +60,8 @@ internal class KimiCodeSubagentTool(
             append("cd ").append(shellQuote(projectPath)).append(" 2>/dev/null || cd /workspace\n")
             append("echo ").append(escapedTask).append(" > /tmp/.kimi_subagent_task.txt\n")
             append("export TERM=dumb NO_COLOR=1\n")
-            append("kimi --prompt \"$(cat /tmp/.kimi_subagent_task.txt)\" --non-interactive 2>&1 || kimi -p \"$(cat /tmp/.kimi_subagent_task.txt)\" 2>&1\n")
+            // 修复：移除不存在的 --non-interactive 参数，使用标准的 kimi -p 并合并输出
+            append("kimi -p \"$(cat /tmp/.kimi_subagent_task.txt)\" 2>&1\n")
             append("EXIT_CODE=$?\n")
             append("echo '===GIT_STATUS_BEGIN==='\n")
             append("git status --short 2>/dev/null || true\n")

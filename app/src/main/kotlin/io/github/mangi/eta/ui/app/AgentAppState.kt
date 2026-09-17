@@ -1374,6 +1374,7 @@ internal class AgentAppState(
                 importance = card.importance,
                 customId = card.id,
             )
+            repo.syncToMarkdownMirror(appContext)
             val updatedCards = repo.listCards()
             val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
@@ -1392,6 +1393,7 @@ internal class AgentAppState(
         scope.launch(Dispatchers.IO) {
             val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
             repo.deleteCard(id)
+            repo.syncToMarkdownMirror(appContext)
             val updatedCards = repo.listCards()
             val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
@@ -1404,6 +1406,7 @@ internal class AgentAppState(
         scope.launch(Dispatchers.IO) {
             val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
             val count = repo.clearAll()
+            repo.syncToMarkdownMirror(appContext)
             val updatedCards = repo.listCards()
             val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {
@@ -1416,6 +1419,7 @@ internal class AgentAppState(
         scope.launch(Dispatchers.IO) {
             val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
             val count = repo.importFromJson(jsonString)
+            repo.syncToMarkdownMirror(appContext)
             val updatedCards = repo.listCards()
             val updatedSpaces = repo.listSpaces()
             withContext(Dispatchers.Main) {

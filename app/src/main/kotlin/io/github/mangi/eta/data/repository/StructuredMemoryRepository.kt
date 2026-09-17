@@ -166,7 +166,7 @@ class StructuredMemoryRepository(private val storageFile: File) {
     fun listSpaces(): List<String> {
         ensureLoaded()
         return lock.read {
-            val set = linkedSetOf("全部", "通用", "用户信息", "工作", "生活", "开发", "偏好")
+            val set = linkedSetOf("全部", "通用", "全局准则", "用户信息", "工作", "生活", "开发", "偏好")
             cards.forEach { if (it.space.isNotBlank()) set.add(it.space) }
             set.toList()
         }
@@ -292,6 +292,56 @@ class StructuredMemoryRepository(private val storageFile: File) {
     }
 
     fun importFromOperitJson(jsonString: String): Int = importFromJson(jsonString)
+
+    /**
+     * 将全部记忆卡片自动生成一份格式优雅的 Markdown 镜像文本，用于底层 MEMORY.md 兼容
+     */
+    fun generateMarkdownMirror(): String {
+        ensureLoaded()
+        return lock.read {
+            if (cards.isEmpty()) return@read "# 核心记忆\n\n暂无持久记忆。\n"
+
+            buildString {
+                appendLine("# 核心记忆")
+                appendLine()
+
+                // 优先展示全局准则，其余分类按字母顺序
+                val grouped = cards.groupBy { it.space }
+                val sortedSpaces = grouped.keys.sortedWith { a, b ->
+                    when {
+                        a == "全局准则" -> -1
+                        b == "全局准则" -> 1
+                        a == "通用" -> -1
+                        b == "通用" -> 1
+                        else -> a.compareTo(b)
+                    }
+                }
+
+                sortedSpaces.forEach { space ->
+                    val spaceCards = grouped[space].orEmpty().sortedWith(
+                        compareByDescending<MemoryCard> { it.importance }.thenByDescending { it.updatedAt }
+                    )
+                    appendLine("## $space")
+                    spaceCards.forEach { card ->
+                        val tagStr = if (card.tags.isNotEmpty()) "|${card.tags.joinToString(",")}" else ""
+                        val singleLine = card.content.replace("\n", " ").trim()
+                        appendLine("- [$space$tagStr] ${card.title}: $singleLine")
+                    }
+                    appendLine()
+                }
+            }.trimEnd() + "\n"
+        }
+    }
+
+    /**
+     * 同步写回底层的 MEMORY.md 文件，确保全系统与 Agent 提示词双向镜像
+     */
+    fun syncToMarkdownMirror(context: Context) {
+        val markdown = generateMarkdownMirror()
+        try {
+            AgentMemoryRepository.replaceAll(context, markdown)
+        } catch (_: Exception) {}
+    }
 
     fun toCompactPrompt(space: String? = null, limit: Int = 5): String {
         val selectedCards = queryCards(space = space, limit = limit)

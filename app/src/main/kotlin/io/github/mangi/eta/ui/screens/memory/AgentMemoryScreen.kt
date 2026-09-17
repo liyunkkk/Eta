@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,20 +16,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
@@ -73,7 +72,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import top.yukonga.miuix.kmp.window.WindowDialog
-import java.io.File
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -85,8 +83,8 @@ internal fun AgentMemoryScreen(
     onAction: (AgentMemoryAction) -> Unit,
 ) {
     val context = LocalContext.current
-    var showClearMdDialog by remember { mutableStateOf(false) }
     var showClearCardsDialog by remember { mutableStateOf(false) }
+    var showMirrorPreviewDialog by remember { mutableStateOf(false) }
     var deleteTargetCardId by remember { mutableStateOf<String?>(null) }
     var editDialogCard by remember { mutableStateOf<MemoryCard?>(null) }
     var isNewCardDialog by remember { mutableStateOf(false) }
@@ -129,15 +127,17 @@ internal fun AgentMemoryScreen(
                 .horizontalCutoutPadding()
                 .padding(top = paddingValues.calculateTopPadding()),
         ) {
+            // 全屏流式统一记忆管理中枢
             LazyColumn(
                 modifier = Modifier
-                    .weight(1f, fill = false)
+                    .fillMaxSize()
                     .scrollEndHaptic()
                     .overScrollVertical()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     start = sidePadding,
                     end = sidePadding,
+                    bottom = 32.dp,
                 ),
                 overscrollEffect = null,
             ) {
@@ -157,12 +157,12 @@ internal fun AgentMemoryScreen(
                         )
                         BasicComponent(
                             title = stringResource(R.string.ui_core_memory_injection_budget_48b5d5),
-                            summary = stringResource(R.string.memory_budget_summary, formatNumber(state.coreBudgetChars)),
+                            summary = "高优先级准则与核心记忆自动注入上下文（上限 ${formatNumber(state.coreBudgetChars)} 字符）",
                         )
                     }
                 }
 
-                // ── 结构化记忆卡片管理中枢 ──────────────────────────
+                // ── 记忆库操作顶栏 ──────────────────────────────────
                 item(key = "cards-header") {
                     Row(
                         modifier = Modifier
@@ -171,12 +171,17 @@ internal fun AgentMemoryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SmallTitle("结构化记忆库 (${state.cards.size})")
+                        SmallTitle("统一记忆库 (${state.cards.size})")
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             IconButton(
                                 onClick = {
                                     isNewCardDialog = true
-                                    editDialogCard = MemoryCard(title = "", content = "", space = if (state.selectedSpace != "全部") state.selectedSpace else "通用")
+                                    editDialogCard = MemoryCard(
+                                        title = "",
+                                        content = "",
+                                        space = if (state.selectedSpace != "全部") state.selectedSpace else "全局准则",
+                                        importance = if (state.selectedSpace == "全局准则") 5 else 3,
+                                    )
                                 },
                             ) {
                                 Icon(
@@ -206,13 +211,22 @@ internal fun AgentMemoryScreen(
                                     tint = MiuixTheme.colorScheme.onSurface,
                                 )
                             }
+                            IconButton(
+                                onClick = { showMirrorPreviewDialog = true },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Description,
+                                    contentDescription = "底层镜像预览",
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                )
+                            }
                             if (state.cards.isNotEmpty()) {
                                 IconButton(
                                     onClick = { showClearCardsDialog = true },
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.DeleteSweep,
-                                        contentDescription = "清空所有卡片",
+                                        contentDescription = "清空全部",
                                         tint = MiuixTheme.colorScheme.error,
                                     )
                                 }
@@ -221,7 +235,7 @@ internal fun AgentMemoryScreen(
                     }
                 }
 
-                // ── 搜索框 ──────────────────────────────────────
+                // ── 实时搜索框 ──────────────────────────────────────
                 item(key = "search-bar") {
                     Card(
                         modifier = Modifier
@@ -231,7 +245,7 @@ internal fun AgentMemoryScreen(
                         TextField(
                             value = state.searchQuery,
                             onValueChange = { onAction(AgentMemoryAction.SearchQueryChanged(it)) },
-                            label = "搜索记忆（标题、正文或标签）",
+                            label = "搜索准则、偏好或标签",
                             useLabelAsPlaceholder = true,
                             leadingIcon = {
                                 Icon(
@@ -259,7 +273,7 @@ internal fun AgentMemoryScreen(
                     }
                 }
 
-                // ── 空间分类药丸选择器 (Horizontal Filter Chips) ──────
+                // ── 空间横向分类药丸 (Filter Chips) ───────────────────
                 item(key = "space-chips") {
                     Row(
                         modifier = Modifier
@@ -270,12 +284,16 @@ internal fun AgentMemoryScreen(
                     ) {
                         state.spaces.forEach { space ->
                             val isSelected = space == state.selectedSpace
+                            val isRule = space == "全局准则"
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(percent = 50))
                                     .background(
-                                        if (isSelected) MiuixTheme.colorScheme.primary
-                                        else MiuixTheme.colorScheme.surface
+                                        when {
+                                            isSelected -> MiuixTheme.colorScheme.primary
+                                            isRule -> MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                            else -> MiuixTheme.colorScheme.surface
+                                        }
                                     )
                                     .clickable { onAction(AgentMemoryAction.SelectSpace(space)) }
                                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -285,39 +303,47 @@ internal fun AgentMemoryScreen(
                                     style = MiuixTheme.textStyles.footnote1.copy(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     ),
-                                    color = if (isSelected) MiuixTheme.colorScheme.onPrimary
-                                    else MiuixTheme.colorScheme.onSurface,
+                                    color = when {
+                                        isSelected -> MiuixTheme.colorScheme.onPrimary
+                                        isRule -> MiuixTheme.colorScheme.primary
+                                        else -> MiuixTheme.colorScheme.onSurface
+                                    },
                                 )
                             }
                         }
                     }
                 }
 
-                // ── 记忆卡片列表 ────────────────────────────────
+                // ── 统一记忆卡片列表 ────────────────────────────────
                 val filtered = state.filteredCards
                 if (filtered.isEmpty()) {
                     item(key = "empty-cards") {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
                         ) {
                             Column(
-                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(
-                                    text = if (state.searchQuery.isNotEmpty()) "未找到匹配的记忆卡片" else "当前空间暂无记忆卡片",
+                                    text = if (state.searchQuery.isNotEmpty()) "未匹配到相关记忆" else "当前分类暂无记忆或准则",
                                     style = MiuixTheme.textStyles.body2,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
                                 TextButton(
-                                    text = "+ 新增第一条记忆",
+                                    text = "+ 新增一条规则或偏好",
                                     colors = ButtonDefaults.textButtonColorsPrimary(),
                                     onClick = {
                                         isNewCardDialog = true
-                                        editDialogCard = MemoryCard(title = "", content = "", space = if (state.selectedSpace != "全部") state.selectedSpace else "通用")
+                                        editDialogCard = MemoryCard(
+                                            title = "",
+                                            content = "",
+                                            space = if (state.selectedSpace != "全部") state.selectedSpace else "全局准则",
+                                            importance = if (state.selectedSpace == "全局准则") 5 else 3,
+                                        )
                                     },
                                 )
                             }
@@ -326,6 +352,8 @@ internal fun AgentMemoryScreen(
                 } else {
                     items(filtered.size, key = { filtered[it].id }) { idx ->
                         val card = filtered[idx]
+                        val isRule = card.space == "全局准则"
+
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -345,13 +373,16 @@ internal fun AgentMemoryScreen(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(4.dp))
-                                                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                                .background(
+                                                    if (isRule) Color(0xFFFF5722).copy(alpha = 0.15f)
+                                                    else MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                                )
                                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                                         ) {
                                             Text(
                                                 text = card.space,
                                                 style = MiuixTheme.textStyles.footnote1.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                                                color = MiuixTheme.colorScheme.primary,
+                                                color = if (isRule) Color(0xFFFF5722) else MiuixTheme.colorScheme.primary,
                                             )
                                         }
                                         Text(
@@ -364,7 +395,7 @@ internal fun AgentMemoryScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     ) {
-                                        // 重要度星星
+                                        // 5 颗星重要度渲染
                                         repeat(card.importance) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Star,
@@ -384,7 +415,7 @@ internal fun AgentMemoryScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Edit,
-                                                contentDescription = "编辑卡片",
+                                                contentDescription = "编辑",
                                                 modifier = Modifier.size(15.dp),
                                                 tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                             )
@@ -396,7 +427,7 @@ internal fun AgentMemoryScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Delete,
-                                                contentDescription = "删除卡片",
+                                                contentDescription = "删除",
                                                 modifier = Modifier.size(15.dp),
                                                 tint = MiuixTheme.colorScheme.error,
                                             )
@@ -438,76 +469,6 @@ internal fun AgentMemoryScreen(
                     }
                 }
             }
-
-            // ── MEMORY.md 自由文本底栏 ──────────────────────────
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = sidePadding)
-                    .imePadding()
-                    .navigationBarsPadding(),
-            ) {
-                SmallTitle("全局准则 (MEMORY.md)")
-                Card(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .padding(bottom = 12.dp),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        TextField(
-                            value = state.draft,
-                            onValueChange = { onAction(AgentMemoryAction.DraftChanged(it)) },
-                            label = stringResource(R.string.ui_core_memory_user_name_long_term_preferences_aa6ff9),
-                            useLabelAsPlaceholder = true,
-                            enabled = !state.isLoading && !state.isSaving,
-                            minLines = 4,
-                            maxLines = 8,
-                            textStyle = MiuixTheme.textStyles.body2.copy(fontFamily = FontFamily.Monospace),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            val overLimit = state.draftBytes > state.maxBytes
-                            Text(
-                                text = when {
-                                    overLimit -> stringResource(R.string.memory_over_limit)
-                                    state.hasUnsavedChanges -> stringResource(R.string.memory_unsaved_changes)
-                                    else -> ""
-                                },
-                                color = if (overLimit) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                style = MiuixTheme.textStyles.footnote1,
-                            )
-                            Text(
-                                text = "${formatBytes(state.draftBytes)} / 1 MiB",
-                                color = if (overLimit) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                style = MiuixTheme.textStyles.footnote1,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            TextButton(
-                                text = stringResource(R.string.ui_clear_84fcd7),
-                                enabled = !state.isLoading && !state.isSaving && state.draft.isNotEmpty(),
-                                onClick = { showClearMdDialog = true },
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(
-                                text = if (state.isSaving) stringResource(R.string.memory_saving) else stringResource(R.string.memory_save),
-                                enabled = state.canSave,
-                                onClick = { onAction(AgentMemoryAction.Save) },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.textButtonColorsPrimary(),
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -521,7 +482,7 @@ internal fun AgentMemoryScreen(
 
         WindowDialog(
             show = true,
-            title = if (isNewCardDialog) "新增记忆卡片" else "编辑记忆卡片",
+            title = if (isNewCardDialog) "新增记忆条目" else "编辑记忆条目",
             onDismissRequest = { editDialogCard = null },
         ) {
             Column(
@@ -531,21 +492,21 @@ internal fun AgentMemoryScreen(
                 TextField(
                     value = editTitle,
                     onValueChange = { editTitle = it },
-                    label = "记忆标题 (例如: 工作目录规范)",
+                    label = "条目标题 (如: 工作目录规范、手机型号)",
                     useLabelAsPlaceholder = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 TextField(
                     value = editSpace,
                     onValueChange = { editSpace = it },
-                    label = "分类空间 (例如: 通用、工作、生活、开发、偏好)",
+                    label = "分类空间 (如: 全局准则、用户信息、环境配置、偏好)",
                     useLabelAsPlaceholder = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 TextField(
                     value = editContent,
                     onValueChange = { editContent = it },
-                    label = "核心内容",
+                    label = "具体事实或行为要求",
                     useLabelAsPlaceholder = true,
                     minLines = 3,
                     maxLines = 6,
@@ -554,7 +515,7 @@ internal fun AgentMemoryScreen(
                 TextField(
                     value = editTagsStr,
                     onValueChange = { editTagsStr = it },
-                    label = "标签 (多个标签用逗号隔开)",
+                    label = "标签 (逗号分隔，如: 规范, 路径)",
                     useLabelAsPlaceholder = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -564,13 +525,13 @@ internal fun AgentMemoryScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "重要度: ${editImportance.toInt()} 星",
-                        style = MiuixTheme.textStyles.body2,
+                        text = "重要度: ${editImportance.toInt()} 星 (4~5星优先自动注入每次新会话)",
+                        style = MiuixTheme.textStyles.footnote1,
                         color = MiuixTheme.colorScheme.onSurface,
                     )
                     Row {
                         repeat(editImportance.toInt()) {
-                            Icon(Icons.Rounded.Star, null, tint = Color(0xFFFFB300), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Star, null, tint = Color(0xFFFFB300), modifier = Modifier.size(15.dp))
                         }
                     }
                 }
@@ -622,8 +583,8 @@ internal fun AgentMemoryScreen(
     deleteTargetCardId?.let { cardId ->
         WindowDialog(
             show = true,
-            title = "删除记忆卡片",
-            summary = "确认删除该条记忆卡片？删除后 AI 将不再引用该事实。",
+            title = "删除记忆条目",
+            summary = "确认删除该条记忆？删除后底层 MEMORY.md 将同步抹除该记录，AI 不再遵循此要求。",
             onDismissRequest = { deleteTargetCardId = null },
         ) {
             MiuixDialogActions(
@@ -642,12 +603,12 @@ internal fun AgentMemoryScreen(
     if (showClearCardsDialog) {
         WindowDialog(
             show = true,
-            title = "清空全部记忆卡片",
-            summary = "将永久清除所有已记录的结构化记忆卡片，此操作不可撤销。",
+            title = "清空全部记忆",
+            summary = "将永久清空所有已记录的卡片及底层 MEMORY.md 镜像，此操作不可撤销。",
             onDismissRequest = { showClearCardsDialog = false },
         ) {
             MiuixDialogActions(
-                confirmText = "清空全部",
+                confirmText = "全部清空",
                 destructive = true,
                 onCancel = { showClearCardsDialog = false },
                 onConfirm = {
@@ -658,24 +619,34 @@ internal fun AgentMemoryScreen(
         }
     }
 
-    // ── 清空 MEMORY.md 弹窗 ──────────────────────────────
-    if (showClearMdDialog) {
+    // ── 底层同步镜像只读预览弹窗 ─────────────────────────
+    if (showMirrorPreviewDialog) {
+        val mirrorText = remember(state.cards) {
+            io.github.mangi.eta.data.repository.StructuredMemoryRepository(context).generateMarkdownMirror()
+        }
         WindowDialog(
             show = true,
-            title = stringResource(R.string.ui_clear_all_memory_a43bd3),
-            summary = stringResource(R.string.ui_the_entire_contents_of_memory_md_will_be_deleted_and_83a8ac),
-            onDismissRequest = { showClearMdDialog = false },
+            title = "底层 MEMORY.md 实时镜像预览",
+            summary = "系统已自动将上方卡片编译为标准 Markdown 供 Agent Runtime 挂载注入：",
+            onDismissRequest = { showMirrorPreviewDialog = false },
         ) {
-            MiuixDialogActions(
-                confirmText = stringResource(R.string.memory_clear),
-                destructive = true,
-                confirmEnabled = !state.isSaving,
-                onCancel = { showClearMdDialog = false },
-                onConfirm = {
-                    showClearMdDialog = false
-                    onAction(AgentMemoryAction.Clear)
-                },
-            )
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                ) {
+                    Text(
+                        text = mirrorText,
+                        style = MiuixTheme.textStyles.footnote1.copy(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.padding(12.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                TextButton(
+                    text = "关闭预览",
+                    onClick = { showMirrorPreviewDialog = false },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 
@@ -694,12 +665,6 @@ internal fun AgentMemoryScreen(
             )
         }
     }
-}
-
-private fun formatBytes(bytes: Int): String = when {
-    bytes < 1_024 -> "$bytes B"
-    bytes < 1_024 * 1_024 -> "%.1f KiB".format(bytes / 1_024.0)
-    else -> "%.2f MiB".format(bytes / (1_024.0 * 1_024.0))
 }
 
 private fun formatNumber(value: Int): String = NumberFormat.getIntegerInstance().format(value)
