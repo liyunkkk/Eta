@@ -23,7 +23,7 @@ internal object AgentPromptBuilder {
             runCatching { AgentConversationCodec.toJsonObject(item) }.getOrNull()?.let(messages::put)
         }
         messages.put(AgentConversationCodec.userMessage(prompt, images))
-        return messages
+        return DynamicContextOptimizer.optimize(messages)
     }
 
     fun buildSystemMessages(

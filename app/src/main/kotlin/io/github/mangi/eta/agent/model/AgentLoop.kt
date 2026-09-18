@@ -92,7 +92,8 @@ internal class AgentLoop(
             toolCallValidator = AgentToolCallValidator(roundTools)
             publishTranscript()
             context.compact(roundTools)
-            var requestMessages = roleplayContext?.projectMessages(messages, roundTools) ?: messages
+            val rawRequestMessages = roleplayContext?.projectMessages(messages, roundTools) ?: messages
+            val requestMessages = DynamicContextOptimizer.optimize(rawRequestMessages, roundTools)
             var requestEstimate = AgentContextBudget.rawEstimate(requestMessages, roundTools)
             var roundInputTokens: Int? = null
             var overflowAttempts = 0

@@ -110,6 +110,8 @@ jobs:
           --tests io.github.mangi.eta.ui.app.AgentConversationStoreTest
           --tests io.github.mangi.eta.agent.tool.AgentToolRequirementsTest
           --tests io.github.mangi.eta.agent.tool.AssistantConfigSanitizerTest
+          --tests io.github.mangi.eta.agent.model.DynamicContextOptimizerTest
+          --tests io.github.mangi.eta.data.repository.StructuredMemoryRepositoryTest
 
       - name: 构建 Debug APK
         run: >-
