@@ -2636,7 +2636,7 @@ fun deleteMessageTurn(messageId: String) {
             scope.launch(Dispatchers.IO) {
                 if (result.ok) {
                     val summary = result.content.take(200).trim()
-                    taskManager.dao.markCompleted(runningTaskId, TaskQueueStatus.COMPLETED, summary, now)
+                    taskManager.dao.markCompleted(runningTaskId, summary, now)
                 } else {
                     val err = result.error ?: "未完成"
                     taskManager.dao.markFailed(runningTaskId, err, now)

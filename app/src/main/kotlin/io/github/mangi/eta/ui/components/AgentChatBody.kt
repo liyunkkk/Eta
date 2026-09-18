@@ -156,6 +156,7 @@ internal fun AgentChatBody(
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
+    onRetryTask: (String) -> Unit = {},
     characterName: String? = null,
     isDrawerOpen: Boolean = false,
     modifier: Modifier = Modifier,
