@@ -145,11 +145,13 @@ object DynamicContextOptimizer {
         val map = mutableMapOf<String, String>()
         for (i in 0 until messages.length()) {
             val msg = messages.optJSONObject(i) ?: continue
-            val rawCalls = when (val tc = msg.opt("tool_calls")) {
+            val tc = msg.opt("tool_calls")
+            val rawCalls: JSONArray? = when (tc) {
                 is JSONArray -> tc
                 is String -> runCatching { JSONArray(tc) }.getOrNull()
                 else -> null
-            } ?: continue
+            }
+            if (rawCalls == null) continue
 
             for (j in 0 until rawCalls.length()) {
                 val call = rawCalls.optJSONObject(j) ?: continue
