@@ -284,7 +284,7 @@ internal class AgentTaskManager private constructor(
                 val now = System.currentTimeMillis()
                 if (result.ok) {
                     val summary = extractSummary(result.content)
-                    dao.markCompleted(nextTask.taskId, TaskQueueStatus.COMPLETED, summary, now)
+                    dao.markCompleted(nextTask.taskId, summary, now)
                 } else {
                     // 非阻塞标记失败并继续
                     val errorMsg = result.error ?: "执行未完成"
