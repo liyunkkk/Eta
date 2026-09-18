@@ -268,6 +268,7 @@ internal fun ChatMessageItem(
     onDeleteMessage: (String) -> Unit = {},
     onRegenerateMessage: (String) -> Unit = {},
     onSelectReplyCandidate: (String, Int) -> Unit = { _, _ -> },
+    onForkResendMessage: (String) -> Unit = {},
 ) {
     when (message) {
         is UserMessageUi -> UserMessageBubble(
@@ -276,6 +277,7 @@ internal fun ChatMessageItem(
             isEditing = isEditing,
             onEdit = { onEditMessage(message.id) },
             onDelete = { onDeleteMessage(message.id) },
+            onForkResend = { onForkResendMessage(message.id) },
             modifier = modifier,
         )
         is AgentMessageUi -> AgentMessageBlock(
@@ -497,6 +499,7 @@ private fun UserMessageBubble(
     isEditing: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onForkResend: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     @Suppress("DEPRECATION")
@@ -545,6 +548,14 @@ private fun UserMessageBubble(
                             onClick = {
                                 tooltipState.dismiss()
                                 onDelete()
+                            },
+                        )
+                        MessageTooltipAction(
+                            icon = Icons.Rounded.Refresh,
+                            label = "从此处分叉重发",
+                            onClick = {
+                                tooltipState.dismiss()
+                                onForkResend()
                             },
                         )
                     }

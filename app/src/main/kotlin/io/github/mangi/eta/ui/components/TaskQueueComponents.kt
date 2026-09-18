@@ -1,7 +1,8 @@
 package io.github.mangi.eta.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,9 +28,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,11 +42,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.mangi.eta.data.db.TaskAttachment
 import io.github.mangi.eta.ui.model.TaskItemUi
 import io.github.mangi.eta.ui.model.TaskQueueUiState
 import io.github.mangi.eta.ui.model.TaskStatusUi
@@ -54,6 +57,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -138,6 +142,8 @@ fun TaskCardItem(
     isCompact: Boolean = false,
     onDelete: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -181,6 +187,40 @@ fun TaskCardItem(
                             contentDescription = "删除任务",
                             modifier = Modifier.size(16.dp),
                             tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                        )
+                    }
+                }
+            }
+
+            // 附件缩略图（图片内联解码，文件以图标占位）
+            if (task.hasAttachments) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    task.attachments.forEach { attachment ->
+                        TaskAttachmentThumbnail(attachment)
+                    }
+                }
+            }
+
+            // 失败任务的操作：原样重试 + 编辑指令
+            if (task.status == TaskStatusUi.Failed && (onRetry != null || onEdit != null)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    onRetry?.let { retry ->
+                        TextButton(
+                            text = "重试",
+                            onClick = retry,
+                            minHeight = 30.dp,
+                        )
+                    }
+                    onEdit?.let { edit ->
+                        TextButton(
+                            text = "编辑",
+                            onClick = edit,
+                            minHeight = 30.dp,
                         )
                     }
                 }
@@ -282,6 +322,44 @@ private fun TaskStatusTag(status: TaskStatusUi) {
     }
 }
 
+/** 任务附件缩略图：图片内联解码，文件用图标占位并显示文件名。 */
+@Composable
+private fun TaskAttachmentThumbnail(attachment: TaskAttachment) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MiuixTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (attachment.kind == TaskAttachment.KIND_IMAGE) {
+            val bitmap = rememberDataUrlBitmap(attachment.value)
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "图片附件",
+                    modifier = Modifier.size(40.dp),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Description,
+                    contentDescription = "图片附件",
+                    modifier = Modifier.size(18.dp),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                )
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.Description,
+                contentDescription = "文件附件",
+                modifier = Modifier.size(18.dp),
+                tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            )
+        }
+    }
+}
+
 /**
  * 统一追加指令输入框（Steering Input Box）
  */
@@ -362,6 +440,8 @@ fun TaskTriTabDashboard(
     onDeleteTask: (String) -> Unit,
     modifier: Modifier = Modifier,
     isFloatingOverlay: Boolean = false,
+    onRetryTask: (String) -> Unit = {},
+    onEditTask: (String) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -510,6 +590,12 @@ fun TaskTriTabDashboard(
                                 task = task,
                                 isCompact = true,
                                 onDelete = { onDeleteTask(task.taskId) },
+                                onRetry = if (task.status == TaskStatusUi.Failed) {
+                                    { onRetryTask(task.taskId) }
+                                } else null,
+                                onEdit = if (task.status == TaskStatusUi.Failed) {
+                                    { onEditTask(task.taskId) }
+                                } else null,
                             )
                         }
                     }

@@ -136,6 +136,7 @@ fun AgentAppRoot(
     var conversationExportTarget by remember { mutableStateOf<ConversationSummaryUi?>(null) }
     var messageDeleteTarget by remember { mutableStateOf<MessageMutationTarget?>(null) }
     var messageRegenerateTarget by remember { mutableStateOf<MessageMutationTarget?>(null) }
+    var taskEditTarget by remember { mutableStateOf<io.github.mangi.eta.ui.model.TaskItemUi?>(null) }
     val conversationExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/markdown"),
     ) { uri ->
@@ -218,6 +219,7 @@ fun AgentAppRoot(
             isCurrentRoute = backStack.lastOrNull() == route,
             conversationPaneState = agentState.conversationPaneState,
             isConversationPaneOpen = conversationPaneOpen,
+            homeTitle = agentState.currentConversationTitle(),
             onBack = { popRoute() },
             onOpenConversationPane = { conversationPaneOpen = true },
             onDismissConversationPane = { conversationPaneOpen = false },
@@ -340,6 +342,7 @@ fun AgentAppRoot(
                                         messageRegenerateTarget = MessageMutationTarget(action.id, impact.laterTurnCount)
                                     }
                                 }
+                                is AgentHomeAction.ForkResendMessage -> agentState.forkResendFromMessage(action.id)
                                 is AgentHomeAction.SelectReplyCandidate -> agentState.selectReplyCandidate(action.id, action.index)
                                 AgentHomeAction.OpenTools -> pushRoute(AppRoute.Tools)
                                 AgentHomeAction.OpenSkills -> pushRoute(AppRoute.Skills)
@@ -352,6 +355,12 @@ fun AgentAppRoot(
                                 is AgentHomeAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
                                 is AgentHomeAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)
                                 is AgentHomeAction.DeleteTask -> agentState.deleteTask(action.taskId)
+                                is AgentHomeAction.RetryTask -> agentState.retryFailedTask(action.taskId)
+                                is AgentHomeAction.EditTask -> {
+                                    agentState.homeState.taskQueueState.historyTasks
+                                        .firstOrNull { it.taskId == action.taskId }
+                                        ?.let { taskEditTarget = it }
+                                }
                             }
                         },
                         isDrawerOpen = conversationPaneOpen,
@@ -397,10 +406,17 @@ fun AgentAppRoot(
                                         messageRegenerateTarget = MessageMutationTarget(action.id, impact.laterTurnCount)
                                     }
                                 }
+                                is AgentChatAction.ForkResendMessage -> agentState.forkResendFromMessage(action.id)
                                 is AgentChatAction.SelectReplyCandidate -> agentState.selectReplyCandidate(action.id, action.index)
                                 is AgentChatAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
                                 is AgentChatAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)
                                 is AgentChatAction.DeleteTask -> agentState.deleteTask(action.taskId)
+                                is AgentChatAction.RetryTask -> agentState.retryFailedTask(action.taskId)
+                                is AgentChatAction.EditTask -> {
+                                    agentState.homeState.taskQueueState.historyTasks
+                                        .firstOrNull { it.taskId == action.taskId }
+                                        ?.let { taskEditTarget = it }
+                                }
                             }
                         },
                     )
@@ -812,6 +828,37 @@ fun AgentAppRoot(
                     messageRegenerateTarget = null
                 },
             )
+        }
+    }
+    taskEditTarget?.let { task ->
+        var editedPrompt by remember(task.taskId) { mutableStateOf(task.prompt) }
+        WindowDialog(
+            show = true,
+            title = "编辑并重试任务",
+            onDismissRequest = { taskEditTarget = null },
+        ) {
+            Column {
+                TextField(
+                    value = editedPrompt,
+                    onValueChange = { editedPrompt = it },
+                    label = "任务指令",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                MiuixDialogActions(
+                    confirmText = stringResource(R.string.action_regenerate),
+                    confirmEnabled = editedPrompt.isNotBlank(),
+                    onCancel = { taskEditTarget = null },
+                    onConfirm = {
+                        agentState.editAndRetryFailedTask(
+                            taskId = task.taskId,
+                            prompt = editedPrompt,
+                            attachments = task.attachments,
+                        )
+                        taskEditTarget = null
+                    },
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
         }
     }
 }

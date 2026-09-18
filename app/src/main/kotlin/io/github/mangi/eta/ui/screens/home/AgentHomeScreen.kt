@@ -54,6 +54,7 @@ internal fun AgentHomeScreen(
             onDeleteMessage = { id -> onAction(AgentHomeAction.DeleteMessage(id)) },
             onRegenerateMessage = { id -> onAction(AgentHomeAction.RegenerateMessage(id)) },
             onSelectReplyCandidate = { id, index -> onAction(AgentHomeAction.SelectReplyCandidate(id, index)) },
+            onForkResendMessage = { id -> onAction(AgentHomeAction.ForkResendMessage(id)) },
             onSuggestionClick = { prompt ->
                 onAction(AgentHomeAction.SubmitMessage(prompt))
             },
@@ -63,6 +64,8 @@ internal fun AgentHomeScreen(
             taskQueueState = state.taskQueueState,
             onSteerTask = { onAction(AgentHomeAction.SteerActiveTask(it)) },
             onDeleteTask = { onAction(AgentHomeAction.DeleteTask(it)) },
+            onRetryTask = { onAction(AgentHomeAction.RetryTask(it)) },
+            onEditTask = { onAction(AgentHomeAction.EditTask(it)) },
             isDrawerOpen = isDrawerOpen,
             modifier = modifier,
         )

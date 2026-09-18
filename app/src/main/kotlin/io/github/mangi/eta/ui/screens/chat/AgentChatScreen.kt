@@ -51,6 +51,7 @@ internal fun AgentChatScreen(
             onDeleteMessage = { id -> onAction(AgentChatAction.DeleteMessage(id)) },
             onRegenerateMessage = { id -> onAction(AgentChatAction.RegenerateMessage(id)) },
             onSelectReplyCandidate = { id, index -> onAction(AgentChatAction.SelectReplyCandidate(id, index)) },
+            onForkResendMessage = { id -> onAction(AgentChatAction.ForkResendMessage(id)) },
             onSuggestionClick = { prompt ->
                 onAction(AgentChatAction.SubmitMessage(prompt))
             },
@@ -60,6 +61,8 @@ internal fun AgentChatScreen(
             taskQueueState = state.taskQueueState,
             onSteerTask = { onAction(AgentChatAction.SteerActiveTask(it)) },
             onDeleteTask = { onAction(AgentChatAction.DeleteTask(it)) },
+            onRetryTask = { onAction(AgentChatAction.RetryTask(it)) },
+            onEditTask = { onAction(AgentChatAction.EditTask(it)) },
             modifier = modifier,
         )
     }

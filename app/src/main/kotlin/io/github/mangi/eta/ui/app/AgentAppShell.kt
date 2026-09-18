@@ -63,6 +63,7 @@ fun AgentAppShell(
     isCurrentRoute: Boolean,
     conversationPaneState: ConversationPaneUiState?,
     isConversationPaneOpen: Boolean,
+    homeTitle: String = "",
     onBack: () -> Unit,
     onOpenConversationPane: () -> Unit,
     onDismissConversationPane: () -> Unit,
@@ -102,6 +103,7 @@ fun AgentAppShell(
                     TopBarBackdrop(backdrop) {
                         AgentTopBar(
                             route = currentRoute,
+                            homeTitle = homeTitle,
                             scrollBehavior = scrollBehavior,
                             color = topBarColor,
                             onBack = onBack,
@@ -161,6 +163,7 @@ fun AgentAppShell(
 @Composable
 private fun AgentTopBar(
     route: AppRoute?,
+    homeTitle: String,
     scrollBehavior: ScrollBehavior,
     color: Color,
     onBack: () -> Unit,
@@ -205,7 +208,7 @@ private fun AgentTopBar(
     if (isHome) {
         // 首页聊天舞台保持紧凑；二级内容页统一使用可折叠大标题。
         SmallTopAppBar(
-            title = titleForRoute(route),
+            title = homeTitle.ifBlank { titleForRoute(route) },
             color = color,
             scrollBehavior = scrollBehavior,
             navigationIcon = navigationIcon,

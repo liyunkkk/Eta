@@ -2,6 +2,8 @@ package io.github.mangi.eta.ui.model
 
 import androidx.compose.runtime.Immutable
 
+import io.github.mangi.eta.data.db.TaskAttachment
+
 @Immutable
 enum class TaskStatusUi {
     Pending,
@@ -23,7 +25,13 @@ data class TaskItemUi(
     val outputSummary: String? = null,
     val createdAt: Long,
     val completedAt: Long? = null,
-)
+    /** 随任务指令携带的图片与文件附件。 */
+    val attachments: List<TaskAttachment> = emptyList(),
+) {
+    val imageAttachments: List<TaskAttachment> get() = attachments.filter { it.kind == TaskAttachment.KIND_IMAGE }
+    val fileAttachments: List<TaskAttachment> get() = attachments.filter { it.kind == TaskAttachment.KIND_FILE }
+    val hasAttachments: Boolean get() = attachments.isNotEmpty()
+}
 
 @Immutable
 data class TaskQueueUiState(

@@ -8,6 +8,8 @@ import io.github.mangi.eta.agent.runtime.AgentRuntimeClient
 import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.db.EtaDatabase
+import io.github.mangi.eta.data.db.TaskAttachment
+import io.github.mangi.eta.data.db.TaskAttachmentCodec
 import io.github.mangi.eta.data.db.TaskQueueDao
 import io.github.mangi.eta.data.db.TaskQueueEntity
 import io.github.mangi.eta.data.db.TaskQueueStatus
@@ -105,12 +107,13 @@ internal class AgentTaskManager private constructor(
     }
 
     /**
-     * 向队列追加单条任务
+     * 向队列追加单条任务。附件随指令一并落盘，图片走 dataUrl、文件走路径。
      */
     suspend fun enqueueTask(
         conversationId: String,
         title: String,
         prompt: String,
+        attachments: List<TaskAttachment> = emptyList(),
     ): String = withContext(Dispatchers.IO) {
         val count = dao.countTasks(conversationId)
         val taskId = "task-${UUID.randomUUID()}"
@@ -122,6 +125,7 @@ internal class AgentTaskManager private constructor(
             orderIndex = count,
             status = TaskQueueStatus.PENDING,
             createdAt = System.currentTimeMillis(),
+            attachmentsJson = TaskAttachmentCodec.encode(attachments),
         )
         dao.insertTask(entity)
         signalChannel.trySend(Unit)
@@ -169,6 +173,41 @@ internal class AgentTaskManager private constructor(
      */
     suspend fun deleteTask(taskId: String) = withContext(Dispatchers.IO) {
         dao.deleteTask(taskId)
+    }
+
+    /**
+     * 原样重试失败任务（保留原指令与附件），仅当仍处于 FAILED 时生效。
+     */
+    suspend fun retryFailedTask(taskId: String): Int = withContext(Dispatchers.IO) {
+        dao.resetFailedTask(taskId).also { if (it > 0) signalChannel.trySend(Unit) }
+    }
+
+    /**
+     * 编辑并重试失败任务：改写标题、指令与附件后重置为 PENDING。
+     */
+    suspend fun editAndRetryFailedTask(
+        taskId: String,
+        title: String,
+        prompt: String,
+        attachments: List<TaskAttachment> = emptyList(),
+    ): Int = withContext(Dispatchers.IO) {
+        dao.retryFailedTask(
+            taskId = taskId,
+            title = title.ifBlank { "任务" },
+            prompt = prompt,
+            attachmentsJson = TaskAttachmentCodec.encode(attachments),
+        ).also { if (it > 0) signalChannel.trySend(Unit) }
+    }
+
+    /**
+     * 就地更新 PENDING/RUNNING 任务的指令与附件（不改变状态与次序）。
+     */
+    suspend fun updateTaskInstruction(
+        taskId: String,
+        prompt: String,
+        attachments: List<TaskAttachment> = emptyList(),
+    ) = withContext(Dispatchers.IO) {
+        dao.updateTaskInstruction(taskId, prompt, TaskAttachmentCodec.encode(attachments))
     }
 
     /**
@@ -333,5 +372,6 @@ internal class AgentTaskManager private constructor(
         outputSummary = outputSummary,
         createdAt = createdAt,
         completedAt = completedAt,
+        attachments = TaskAttachmentCodec.decode(attachmentsJson),
     )
 }

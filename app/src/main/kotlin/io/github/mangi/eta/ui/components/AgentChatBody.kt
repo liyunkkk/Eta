@@ -149,6 +149,7 @@ internal fun AgentChatBody(
     onDeleteMessage: (String) -> Unit,
     onRegenerateMessage: (String) -> Unit,
     onSelectReplyCandidate: (String, Int) -> Unit,
+    onForkResendMessage: (String) -> Unit = {},
     onSuggestionClick: (String) -> Unit,
     onRunTraceClick: () -> Unit,
     onOpenBrowser: () -> Unit,
@@ -156,6 +157,8 @@ internal fun AgentChatBody(
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
+    onRetryTask: (String) -> Unit = {},
+    onEditTask: (String) -> Unit = {},
     characterName: String? = null,
     isDrawerOpen: Boolean = false,
     modifier: Modifier = Modifier,
@@ -254,6 +257,7 @@ internal fun AgentChatBody(
         onDeleteMessage = onDeleteMessage,
         onRegenerateMessage = onRegenerateMessage,
         onSelectReplyCandidate = onSelectReplyCandidate,
+        onForkResendMessage = onForkResendMessage,
         onSuggestionClick = onSuggestionClick,
         onRunTraceClick = onRunTraceClick,
         onOpenBrowser = onOpenBrowser,
@@ -261,6 +265,8 @@ internal fun AgentChatBody(
         taskQueueState = taskQueueState,
         onSteerTask = onSteerTask,
         onDeleteTask = onDeleteTask,
+        onRetryTask = onRetryTask,
+        onEditTask = onEditTask,
         currentBrowserMessageId = currentBrowserMessageId,
         modifier = modifier,
     )
@@ -303,6 +309,7 @@ private fun AgentChatScaffold(
     onDeleteMessage: (String) -> Unit,
     onRegenerateMessage: (String) -> Unit,
     onSelectReplyCandidate: (String, Int) -> Unit,
+    onForkResendMessage: (String) -> Unit,
     onSuggestionClick: (String) -> Unit,
     onRunTraceClick: () -> Unit,
     onOpenBrowser: () -> Unit,
@@ -310,6 +317,8 @@ private fun AgentChatScaffold(
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
+    onRetryTask: (String) -> Unit = {},
+    onEditTask: (String) -> Unit = {},
     currentBrowserMessageId: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -389,6 +398,7 @@ private fun AgentChatScaffold(
                 onDeleteMessage = onDeleteMessage,
                 onRegenerateMessage = onRegenerateMessage,
                 onSelectReplyCandidate = onSelectReplyCandidate,
+                onForkResendMessage = onForkResendMessage,
                 messageActionsEnabled = !isStreaming && messageEdit == null,
                 editTargetMessageId = messageEdit?.targetMessageId,
                 currentBrowserMessageId = currentBrowserMessageId,
@@ -416,6 +426,7 @@ internal fun AgentConversationMessages(
     onDeleteMessage: (String) -> Unit = {},
     onRegenerateMessage: (String) -> Unit = {},
     onSelectReplyCandidate: (String, Int) -> Unit = { _, _ -> },
+    onForkResendMessage: (String) -> Unit = {},
     messageActionsEnabled: Boolean = false,
     editTargetMessageId: String? = null,
     currentBrowserMessageId: String? = null,
@@ -674,6 +685,7 @@ internal fun AgentConversationMessages(
                             onDeleteMessage = onDeleteMessage,
                             onRegenerateMessage = onRegenerateMessage,
                             onSelectReplyCandidate = onSelectReplyCandidate,
+                            onForkResendMessage = onForkResendMessage,
                             modifier = itemModifier,
                         )
                     }
@@ -998,6 +1010,8 @@ private fun AgentChatBottomBar(
                         }
                     },
                     onDeleteTask = onDeleteTask,
+                    onRetryTask = onRetryTask,
+                    onEditTask = onEditTask,
                     isFloatingOverlay = false,
                 )
             }

@@ -1,5 +1,6 @@
 package io.github.mangi.eta.ui.app
 
+import io.github.mangi.eta.agent.kimi.KimiWebEndpoint
 import io.github.mangi.eta.agent.terminal.DaemonLogsResult
 import io.github.mangi.eta.agent.terminal.DaemonStartResult
 import io.github.mangi.eta.agent.terminal.DetachedTaskStatus
@@ -53,8 +54,16 @@ internal class KimiWebSession(
 
     companion object {
         const val COMMAND = "kimi web --no-open"
-        fun addressFromLogs(text: String): String? = WEB_URL_REGEX.find(text)?.value
-        // token 字符集收紧到 URL safe，避免把日志里的 ANSI 序列尾巴吃进来。
-        private val WEB_URL_REGEX = Regex("""http://127\.0\.0\.1:\d+/#token=[A-Za-z0-9_-]+""")
+
+        /**
+         * 从启动横幅解析带 token 的可打开地址。
+         *
+         * 横幅经 chalk 分色，`#token=` 片段前会插入 ANSI 转义序列，必须先剥离再匹配；
+         * 同时服务端在端口被占用时会向上递增重试，因此不能假定固定端口。
+         */
+        fun addressFromLogs(text: String): String? = KimiWebEndpoint.parseOpenableUrl(text)
+
+        /** 解析完整端点（origin + token），供 REST 直连使用。 */
+        fun endpointFromLogs(text: String): KimiWebEndpoint.Endpoint? = KimiWebEndpoint.parse(text)
     }
 }

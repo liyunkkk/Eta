@@ -1,5 +1,7 @@
 package io.github.mangi.eta.ui.app
 import io.github.mangi.eta.agent.task.AgentTaskManager
+import io.github.mangi.eta.data.db.TaskAttachment
+import io.github.mangi.eta.data.db.TaskAttachmentCodec
 import io.github.mangi.eta.data.db.TaskQueueStatus
 import io.github.mangi.eta.agent.model.AgentContextSnapshot
 
@@ -1066,6 +1068,12 @@ internal class AgentAppState(
         persistConversations()
     }
 
+    /** 当前选中会话的标题；未命名时回退为空串，由顶栏自行决定是否显示占位。 */
+    fun currentConversationTitle(): String =
+        conversationTitles[selectedConversationId]
+            ?.takeIf { it.isNotBlank() }
+            .orEmpty()
+
     fun exportConversationMarkdown(conversationId: String): String? {
         val state = conversationsById[conversationId] ?: return null
         val title = conversationTitles[conversationId]?.takeIf { it.isNotBlank() }
@@ -1107,11 +1115,39 @@ internal class AgentAppState(
         },
     )
 
-    fun sendCurrentMessage(submittedText: String? = null, fromTaskQueue: Boolean = false) {
+    fun sendCurrentMessage(
+        submittedText: String? = null,
+        fromTaskQueue: Boolean = false,
+        taskAttachments: List<TaskAttachment> = emptyList(),
+    ) {
         if (homeState.isCompacting) return
         val prompt = (submittedText ?: homeState.input).trim()
-        val pendingImages = homeState.pendingImages
-        val pendingFileReferences = homeState.pendingFileReferences
+        val pendingImages = if (fromTaskQueue) {
+            taskAttachments.filter { it.kind == TaskAttachment.KIND_IMAGE }.mapIndexed { index, attachment ->
+                PendingImageUi(
+                    id = "task-image-$index-${attachment.value.hashCode()}",
+                    uri = attachment.value,
+                    dataUrl = attachment.value,
+                    mimeType = attachment.mime.ifBlank { attachment.value.imageMimeType() },
+                )
+            }
+        } else {
+            homeState.pendingImages
+        }
+        val pendingFileReferences = if (fromTaskQueue) {
+            taskAttachments.filter { it.kind == TaskAttachment.KIND_FILE }.mapIndexed { index, attachment ->
+                PendingFileReferenceUi(
+                    id = "task-file-$index-${attachment.value.hashCode()}",
+                    reference = AgentFileReference(
+                        displayName = attachment.value.substringAfterLast('/').ifBlank { attachment.value },
+                        absolutePath = attachment.value,
+                        kind = AgentFileReferenceKind.File,
+                    ),
+                )
+            }
+        } else {
+            homeState.pendingFileReferences
+        }
         if (prompt.isBlank() && pendingImages.isEmpty() && pendingFileReferences.isEmpty()) {
             return
         }
@@ -1383,6 +1419,21 @@ internal class AgentAppState(
     fun regenerateMessage(messageId: String) {
         if (homeState.isStreaming || homeState.messageEdit != null) return
         val conversationId = selectedConversationId ?: return
+        forkResendFromMessage(messageId, conversationId)
+    }
+
+    /**
+     * 从指定消息处「分叉重发」：以该消息所属的用户轮次为边界，保留此前历史，
+     * 丢弃其后内容，重新生成后续回复。与 [regenerateMessage] 共享同一实现，
+     * 因为 [AgentConversationRevisionReducer.boundary] 对用户/助手消息都能正确定位。
+     */
+    fun forkResendFromMessage(messageId: String) {
+        if (homeState.isStreaming || homeState.messageEdit != null) return
+        val conversationId = selectedConversationId ?: return
+        forkResendFromMessage(messageId, conversationId)
+    }
+
+    private fun forkResendFromMessage(messageId: String, conversationId: String) {
         if (homeState.roleplay != null) {
             val target = homeState.messages.filterIsInstance<AgentMessageUi>().firstOrNull { it.id == messageId } ?: return
             val prefix = RoleplayConversationReducer.rewriteHistory(homeState, messageId) ?: return
@@ -2834,7 +2885,11 @@ internal class AgentAppState(
                     return@withContext
                 }
                 activeQueueTaskId = nextTask.taskId
-                sendCurrentMessage(nextTask.prompt, fromTaskQueue = true)
+                sendCurrentMessage(
+                    nextTask.prompt,
+                    fromTaskQueue = true,
+                    taskAttachments = TaskAttachmentCodec.decode(nextTask.attachmentsJson),
+                )
             }
         }
     }
@@ -2842,7 +2897,52 @@ internal class AgentAppState(
     fun enqueueTask(taskText: String) {
         val conversationId = ensureSelectedConversationId()
         scope.launch {
-            taskManager.enqueueTask(conversationId = conversationId, prompt = taskText)
+            taskManager.enqueueTask(
+                conversationId = conversationId,
+                prompt = taskText,
+                attachments = taskAttachmentsFromPending(),
+            )
+            withContext(Dispatchers.Main) {
+                pumpTaskQueue()
+            }
+        }
+    }
+
+    /** 把当前输入框待发的图片/文件引用转成任务附件（图片 dataUrl，文件路径）。 */
+    private fun taskAttachmentsFromPending(): List<TaskAttachment> {
+        val images = homeState.pendingImages.map { image ->
+            TaskAttachment.image(image.dataUrl, image.mimeType)
+        }
+        val files = homeState.pendingFileReferences.map { file ->
+            TaskAttachment.file(file.reference.absolutePath)
+        }
+        return images + files
+    }
+
+    /** 原样重试失败任务。 */
+    fun retryFailedTask(taskId: String) {
+        scope.launch {
+            taskManager.retryFailedTask(taskId)
+            withContext(Dispatchers.Main) {
+                pumpTaskQueue()
+            }
+        }
+    }
+
+    /** 编辑并重试失败任务（改写指令与附件后重置为 PENDING）。 */
+    fun editAndRetryFailedTask(
+        taskId: String,
+        prompt: String,
+        attachments: List<TaskAttachment> = emptyList(),
+    ) {
+        val title = prompt.take(24).lines().firstOrNull()?.trim().orEmpty().ifBlank { "任务" }
+        scope.launch {
+            taskManager.editAndRetryFailedTask(
+                taskId = taskId,
+                title = title,
+                prompt = prompt,
+                attachments = attachments,
+            )
             withContext(Dispatchers.Main) {
                 pumpTaskQueue()
             }

@@ -30,6 +30,9 @@ sealed interface AgentHomeAction {
     data class EnqueueTask(val taskText: String) : AgentHomeAction
     data class SteerActiveTask(val instruction: String) : AgentHomeAction
     data class DeleteTask(val taskId: String) : AgentHomeAction
+    data class RetryTask(val taskId: String) : AgentHomeAction
+    data class EditTask(val taskId: String) : AgentHomeAction
+    data class ForkResendMessage(val messageId: String) : AgentHomeAction
 }
 
 sealed interface PermissionHealthAction {
@@ -60,6 +63,9 @@ sealed interface AgentChatAction {
     data class EnqueueTask(val taskText: String) : AgentChatAction
     data class SteerActiveTask(val instruction: String) : AgentChatAction
     data class DeleteTask(val taskId: String) : AgentChatAction
+    data class RetryTask(val taskId: String) : AgentChatAction
+    data class EditTask(val taskId: String) : AgentChatAction
+    data class ForkResendMessage(val messageId: String) : AgentChatAction
 }
 
 sealed interface AgentToolsAction {
