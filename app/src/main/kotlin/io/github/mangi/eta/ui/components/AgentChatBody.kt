@@ -905,6 +905,7 @@ private fun AgentChatBottomBar(
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
+    onRetryTask: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
