@@ -27,7 +27,7 @@ import androidx.room.migration.Migration
         UserPersonaEntity::class,
         TaskQueueEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = false,
 )
 internal abstract class EtaDatabase : RoomDatabase() {
@@ -66,6 +66,7 @@ internal abstract class EtaDatabase : RoomDatabase() {
                         MIGRATION_19_20,
                         MIGRATION_20_21,
                         MIGRATION_21_22,
+                        MIGRATION_22_23,
                     )
                     .addCallback(object : Callback() {
                         override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) { createTextChunkCleanup(db) }
@@ -113,6 +114,11 @@ internal abstract class EtaDatabase : RoomDatabase() {
             database.execSQL("CREATE INDEX IF NOT EXISTS index_agent_task_queue_conversation_id_order_index ON agent_task_queue(conversation_id, order_index)")
             database.execSQL("CREATE INDEX IF NOT EXISTS index_agent_task_queue_status ON agent_task_queue(status)")
         }
+
+        internal val MIGRATION_22_23 = Migration(22, 23) { database ->
+            database.execSQL("ALTER TABLE agent_task_queue ADD COLUMN attachments_json TEXT")
+        }
+
         internal val MIGRATION_20_21 = Migration(20, 21) { database ->
             database.execSQL("ALTER TABLE conversations ADD COLUMN roleplay_json TEXT NOT NULL DEFAULT ''")
             database.execSQL("ALTER TABLE conversations ADD COLUMN revisions_json TEXT NOT NULL DEFAULT ''")
