@@ -30,11 +30,17 @@ internal interface TaskQueueDao {
     @Update
     suspend fun updateTask(task: TaskQueueEntity)
 
-    @Query("UPDATE agent_task_queue SET status = :status, output_summary = :summary, completed_at = :completedAt WHERE task_id = :taskId")
-    suspend fun markCompleted(taskId: String, status: String, summary: String?, completedAt: Long)
+    @Query("UPDATE agent_task_queue SET status = 'RUNNING' WHERE task_id = :taskId")
+    suspend fun markRunning(taskId: String)
+
+    @Query("UPDATE agent_task_queue SET status = 'COMPLETED', output_summary = :outputSummary, completed_at = :completedAt WHERE task_id = :taskId")
+    suspend fun markCompleted(taskId: String, outputSummary: String?, completedAt: Long)
 
     @Query("UPDATE agent_task_queue SET status = 'FAILED', fail_reason = :failReason, completed_at = :completedAt WHERE task_id = :taskId")
     suspend fun markFailed(taskId: String, failReason: String?, completedAt: Long)
+
+    @Query("UPDATE agent_task_queue SET status = 'PENDING', fail_reason = NULL, completed_at = NULL WHERE task_id = :taskId")
+    suspend fun retryTask(taskId: String)
 
     @Query("DELETE FROM agent_task_queue WHERE task_id = :taskId")
     suspend fun deleteTask(taskId: String)

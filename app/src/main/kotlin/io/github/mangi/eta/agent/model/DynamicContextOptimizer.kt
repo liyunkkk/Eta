@@ -15,7 +15,16 @@ object DynamicContextOptimizer {
     fun optimize(messages: JSONArray, roundTools: JSONArray? = null): JSONArray {
         if (messages.length() == 0) return JSONArray()
 
-        val result = JSONArray(messages.toString())
+        // 浅拷贝浅层 JSONObject，消除全量 toString() 与反序列化开销
+        val result = JSONArray()
+        for (i in 0 until messages.length()) {
+            val original = messages.optJSONObject(i)
+            if (original != null) {
+                result.put(JSONObject(original.toString()))
+            } else {
+                result.put(messages.get(i))
+            }
+        }
 
         scrubHistoricalThinking(result)
         evictStaleUiObservations(result)
@@ -44,101 +53,79 @@ object DynamicContextOptimizer {
         val observationIndices = mutableListOf<Int>()
 
         for (i in 0 until messages.length()) {
-            val obj = messages.optJSONObject(i) ?: continue
-            if (obj.optString("role") == "tool" && isScreenObservation(obj, toolCallNames)) {
+            val msg = messages.optJSONObject(i) ?: continue
+            if (msg.optString("role") == "tool" && isScreenObservation(msg, toolCallNames)) {
                 observationIndices.add(i)
             }
         }
 
         if (observationIndices.size > 1) {
             for (i in observationIndices.dropLast(1)) {
-                messages.optJSONObject(i)?.put("content", STALE_OBSERVATION_REPLACEMENT)
+                val msg = messages.optJSONObject(i) ?: continue
+                msg.put("content", STALE_OBSERVATION_REPLACEMENT)
             }
         }
     }
 
     private fun truncateLongToolOutputs(messages: JSONArray) {
-        val toolIndices = mutableListOf<Int>()
+        val latestAssistantIndex = (messages.length() - 1 downTo 0).firstOrNull {
+            messages.optJSONObject(it)?.optString("role") == "assistant"
+        } ?: -1
+
+        var firstPostAssistantToolIndex = -1
+        if (latestAssistantIndex >= 0) {
+            for (i in latestAssistantIndex + 1 until messages.length()) {
+                if (messages.optJSONObject(i)?.optString("role") == "tool") {
+                    firstPostAssistantToolIndex = i
+                    break
+                }
+            }
+        }
+
+        val exemptIndices = if (firstPostAssistantToolIndex >= 0) {
+            (firstPostAssistantToolIndex until messages.length())
+                .filter { messages.optJSONObject(it)?.optString("role") == "tool" }
+                .toSet()
+        } else {
+            emptySet()
+        }
+
         for (i in 0 until messages.length()) {
-            if (messages.optJSONObject(i)?.optString("role") == "tool") {
-                toolIndices.add(i)
-            }
-        }
-        if (toolIndices.isEmpty()) return
+            if (i in exemptIndices) continue
+            val msg = messages.optJSONObject(i) ?: continue
+            if (msg.optString("role") != "tool") continue
 
-        val toolRounds = mutableListOf<MutableList<Int>>()
-        for (idx in toolIndices) {
-            if (toolRounds.isEmpty()) {
-                toolRounds.add(mutableListOf(idx))
-            } else {
-                val lastRound = toolRounds.last()
-                val prevIdx = lastRound.last()
-                var separated = false
-                for (k in prevIdx + 1 until idx) {
-                    if (messages.optJSONObject(k)?.optString("role") != "tool") {
-                        separated = true
-                        break
-                    }
-                }
-                if (separated) {
-                    toolRounds.add(mutableListOf(idx))
-                } else {
-                    lastRound.add(idx)
-                }
-            }
-        }
-
-        if (toolRounds.size <= 1) return
-
-        val nonLatestIndices = toolRounds.dropLast(1).flatten()
-        for (idx in nonLatestIndices) {
-            val toolMsg = messages.optJSONObject(idx) ?: continue
-            val rawContent = toolMsg.opt("content")
+            val rawContent = msg.opt("content")
             val contentStr = when (rawContent) {
                 is String -> rawContent
                 null -> ""
                 else -> rawContent.toString()
             }
-            val truncated = truncateContentIfNeeded(contentStr)
-            if (truncated != contentStr) {
-                toolMsg.put("content", truncated)
+
+            if (contentStr.startsWith("[")) continue
+
+            val lines = contentStr.lines()
+            if (lines.size > MAX_TOOL_CONTENT_LINES || contentStr.length > MAX_TOOL_CONTENT_CHARS) {
+                val truncated = truncateLines(lines, contentStr)
+                msg.put("content", truncated)
             }
         }
     }
 
-    private fun truncateContentIfNeeded(content: String): String {
-        val lines = content.lines()
-        if (content.length <= MAX_TOOL_CONTENT_CHARS && lines.size <= MAX_TOOL_CONTENT_LINES) {
-            return content
+    private fun truncateLines(lines: List<String>, rawContent: String): String {
+        if (lines.size > MAX_TOOL_CONTENT_LINES) {
+            val head = lines.take(TRUNCATE_HEAD_LINES)
+            val tail = lines.takeLast(TRUNCATE_TAIL_LINES)
+            val foldedCount = lines.size - TRUNCATE_HEAD_LINES - TRUNCATE_TAIL_LINES
+            val headText = head.joinToString("\n")
+            val tailText = tail.joinToString("\n")
+            return "$headText\n... [已动态折叠 $foldedCount 行中间输出] ...\n$tailText"
         }
-
-        val totalKeep = TRUNCATE_HEAD_LINES + TRUNCATE_TAIL_LINES
-        val (head, tail, foldedCount) = if (lines.size > totalKeep) {
-            Triple(
-                lines.take(TRUNCATE_HEAD_LINES),
-                lines.takeLast(TRUNCATE_TAIL_LINES),
-                lines.size - totalKeep,
-            )
-        } else {
-            val expanded = lines.flatMap { line ->
-                if (line.length > 80) line.chunked(80) else listOf(line)
-            }.let { exp ->
-                if (exp.size <= totalKeep) {
-                    content.chunked(maxOf(1, content.length / 32))
-                } else {
-                    exp
-                }
-            }
-            Triple(
-                expanded.take(TRUNCATE_HEAD_LINES),
-                expanded.takeLast(TRUNCATE_TAIL_LINES),
-                expanded.size - totalKeep,
-            )
-        }
-
-        val headText = head.joinToString("\n")
-        val tailText = tail.joinToString("\n")
-        return "$headText\n... [已动态折叠 $foldedCount 行中间输出] ...\n$tailText"
+        val headChars = (MAX_TOOL_CONTENT_CHARS / 2) - 30
+        val tailChars = (MAX_TOOL_CONTENT_CHARS / 2) - 30
+        val headText = rawContent.take(headChars)
+        val tailText = rawContent.takeLast(tailChars)
+        return "$headText\n... [已动态折叠中间长文本] ...\n$tailText"
     }
 
     private fun collectToolCallNames(messages: JSONArray): Map<String, String> {
@@ -155,9 +142,9 @@ object DynamicContextOptimizer {
 
             for (j in 0 until rawCalls.length()) {
                 val call = rawCalls.optJSONObject(j) ?: continue
-                val id = call.optString("id")
-                val function = call.optJSONObject("function")
-                val name = function?.optString("name")?.trim().orEmpty()
+                val id = call.optString("id").trim()
+                val fn = call.optJSONObject("function")
+                val name = fn?.optString("name")?.trim().orEmpty()
                     .ifBlank { call.optString("name").trim() }
                 if (id.isNotBlank() && name.isNotBlank()) {
                     map[id] = name

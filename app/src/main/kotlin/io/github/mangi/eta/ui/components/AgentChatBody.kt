@@ -996,6 +996,7 @@ private fun AgentChatBottomBar(
                         }
                     },
                     onDeleteTask = onDeleteTask,
+                    onRetryTask = onRetryTask,
                     isFloatingOverlay = false,
                 )
             }

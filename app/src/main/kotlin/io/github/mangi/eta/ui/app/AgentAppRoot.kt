@@ -359,6 +359,7 @@ fun AgentAppRoot(
                                 is AgentHomeAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
                                 is AgentHomeAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)
                                 is AgentHomeAction.DeleteTask -> agentState.deleteTask(action.taskId)
+                                is AgentHomeAction.RetryTask -> agentState.retryTask(action.taskId)
                             }
                         },
                         isDrawerOpen = conversationPaneOpen,
@@ -409,6 +410,7 @@ fun AgentAppRoot(
                                 is AgentChatAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
                                 is AgentChatAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)
                                 is AgentChatAction.DeleteTask -> agentState.deleteTask(action.taskId)
+                                is AgentChatAction.RetryTask -> agentState.retryTask(action.taskId)
                             }
                         },
                     )

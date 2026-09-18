@@ -3,20 +3,12 @@ package io.github.mangi.eta.ui.model
 import androidx.compose.runtime.Immutable
 
 @Immutable
-enum class TaskStatusUi {
-    Pending,
-    Running,
-    Completed,
-    Failed,
-    Skipped,
-}
-
-@Immutable
 data class TaskItemUi(
     val taskId: String,
     val conversationId: String,
     val title: String,
     val prompt: String,
+    val attachmentsJson: String? = null,
     val orderIndex: Int,
     val status: TaskStatusUi,
     val failReason: String? = null,
@@ -24,6 +16,14 @@ data class TaskItemUi(
     val createdAt: Long,
     val completedAt: Long? = null,
 )
+
+sealed interface TaskStatusUi {
+    data object Pending : TaskStatusUi
+    data object Running : TaskStatusUi
+    data object Completed : TaskStatusUi
+    data object Failed : TaskStatusUi
+    data object Skipped : TaskStatusUi
+}
 
 @Immutable
 data class TaskQueueUiState(

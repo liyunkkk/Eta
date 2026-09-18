@@ -60,6 +60,7 @@ internal fun AgentChatScreen(
             taskQueueState = state.taskQueueState,
             onSteerTask = { onAction(AgentChatAction.SteerActiveTask(it)) },
             onDeleteTask = { onAction(AgentChatAction.DeleteTask(it)) },
+            onRetryTask = { onAction(AgentChatAction.RetryTask(it)) },
             modifier = modifier,
         )
     }

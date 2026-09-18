@@ -24,6 +24,8 @@ internal data class TaskQueueEntity(
     val title: String,
     @ColumnInfo(name = "prompt")
     val prompt: String,
+    @ColumnInfo(name = "attachments_json")
+    val attachmentsJson: String? = null,
     @ColumnInfo(name = "order_index")
     val orderIndex: Int,
     @ColumnInfo(name = "status")

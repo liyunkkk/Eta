@@ -171,6 +171,10 @@ internal class AgentTaskManager private constructor(
         dao.deleteTask(taskId)
     }
 
+    suspend fun retryTask(taskId: String) = withContext(Dispatchers.IO) {
+        dao.retryTask(taskId)
+    }
+
     /**
      * 清空队列
      */
@@ -216,6 +220,7 @@ internal class AgentTaskManager private constructor(
     suspend fun steerOrEnqueue(
         conversationId: String,
         text: String,
+        attachmentsJson: String? = null,
     ): SteerOutcome = withContext(Dispatchers.IO) {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return@withContext SteerOutcome.Failed
@@ -320,6 +325,7 @@ internal class AgentTaskManager private constructor(
         conversationId = conversationId,
         title = title,
         prompt = prompt,
+        attachmentsJson = attachmentsJson,
         orderIndex = orderIndex,
         status = when (status) {
             TaskQueueStatus.PENDING -> TaskStatusUi.Pending

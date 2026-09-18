@@ -63,6 +63,7 @@ internal fun AgentHomeScreen(
             taskQueueState = state.taskQueueState,
             onSteerTask = { onAction(AgentHomeAction.SteerActiveTask(it)) },
             onDeleteTask = { onAction(AgentHomeAction.DeleteTask(it)) },
+            onRetryTask = { onAction(AgentHomeAction.RetryTask(it)) },
             isDrawerOpen = isDrawerOpen,
             modifier = modifier,
         )

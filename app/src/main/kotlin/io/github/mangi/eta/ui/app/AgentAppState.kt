@@ -241,7 +241,7 @@ internal class AgentAppState(
         return copy(
             thinkingEnabled = normalized.enablesReasoning,
             reasoningEffort = normalized,
-            availableReasoningEfforts = currentReasoningCapabilities?.selectableEfforts.orEmpty(),
+            availableReasoningEfforts = io.github.mangi.eta.data.model.ReasoningEffort.entries,
         )
     }
 
@@ -265,9 +265,6 @@ internal class AgentAppState(
                 val enabled = AgentMemoryRepository.isEnabled()
                 val contextWindow = RuntimeConfigRepository.currentRuntimeConfig()?.contextWindow
                 val repo = io.github.mangi.eta.data.repository.StructuredMemoryRepository(appContext)
-                if (snapshot.content.isNotBlank()) {
-                    repo.importFromMarkdown(snapshot.content)
-                }
                 val cards = repo.listCards()
                 val spaces = repo.listSpaces()
                 Triple(snapshot, Pair(enabled, AgentMemoryContextBuilder.coreBudgetChars(contextWindow)), Pair(cards, spaces))
@@ -962,7 +959,7 @@ internal class AgentAppState(
         val resolvedState = state.copy(
             thinkingEnabled = normalized.enablesReasoning,
             reasoningEffort = normalized,
-            availableReasoningEfforts = currentReasoningCapabilities?.selectableEfforts.orEmpty(),
+            availableReasoningEfforts = io.github.mangi.eta.data.model.ReasoningEffort.entries,
         )
         conversationsById = conversationsById + (conversationId to resolvedState)
         homeState = resolvedState
@@ -1129,9 +1126,15 @@ internal class AgentAppState(
         if (!fromTaskQueue) {
             // 1. 运行中追加指令（Mid-run Steering）或降级排队（Auto Enqueue）
             if (homeState.isStreaming) {
-                if (prompt.isNotBlank()) {
+                if (prompt.isNotBlank() || pendingImages.isNotEmpty() || pendingFileReferences.isNotEmpty()) {
                     steerActiveTask(prompt)
-                    updateCurrentConversation(homeState.copy(input = ""))
+                    updateCurrentConversation(
+                        homeState.copy(
+                            input = "",
+                            pendingImages = emptyList(),
+                            pendingFileReferences = emptyList(),
+                        )
+                    )
                 }
                 return
             }
@@ -1154,9 +1157,9 @@ internal class AgentAppState(
                 }
             }
 
-            // 3. 多任务清单语法自动识别（Batch Enqueue）
+            // 3. 多任务或单条编号清单自动识别（1. 任务自动排队）
             val parsedTasks = parseTaskListFromPrompt(prompt)
-            if (parsedTasks.size >= 2) {
+            if (parsedTasks.isNotEmpty()) {
                 val conversationId = ensureSelectedConversationId()
                 scope.launch {
                     taskManager.enqueueTasks(conversationId, parsedTasks)
@@ -2814,7 +2817,7 @@ fun deleteMessageTurn(messageId: String) {
             input = draft.input,
             thinkingEnabled = draft.reasoningEffort.enablesReasoning,
             reasoningEffort = draft.reasoningEffort,
-            availableReasoningEfforts = currentReasoningCapabilities?.selectableEfforts.orEmpty(),
+            availableReasoningEfforts = io.github.mangi.eta.data.model.ReasoningEffort.entries,
             pendingImages = draft.pendingImages,
             pendingFileReferences = draft.pendingFileReferences,
         )
@@ -3017,9 +3020,32 @@ fun deleteMessageTurn(messageId: String) {
         }
     }
 
+    fun retryTask(taskId: String) {
+        val conversationId = ensureSelectedConversationId()
+        scope.launch {
+            taskManager.retryTask(taskId)
+            withContext(Dispatchers.Main) {
+                pumpTaskQueue()
+            }
+        }
+    }
+
     private fun parseTaskListFromPrompt(text: String): List<Pair<String, String>> {
         val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
-        if (lines.size < 2) return emptyList()
+        if (lines.isEmpty()) return emptyList()
+
+        // 单条编号任务识别（例如以 1. 或 1、 开头）
+        if (lines.size == 1) {
+            val numberedRegex = Regex("^(\\d+)[.、]\\s*(.+)$")
+            val match = numberedRegex.matchEntire(lines[0])
+            if (match != null) {
+                val content = match.groupValues[2].trim()
+                if (content.isNotBlank()) {
+                    return listOf(content.take(MAX_TITLE_CHARS) to content)
+                }
+            }
+            return emptyList()
+        }
 
         val taskList = mutableListOf<Pair<String, String>>()
         val checkboxRegex = Regex("^[-*]\\s*\\[[ xX]?\\]\\s*(.+)$")

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -137,6 +138,7 @@ fun TaskCardItem(
     modifier: Modifier = Modifier,
     isCompact: Boolean = false,
     onDelete: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -170,7 +172,36 @@ fun TaskCardItem(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 TaskStatusTag(status = task.status)
-                if (onDelete != null && task.status == TaskStatusUi.Pending) {
+                if (task.status == TaskStatusUi.Failed) {
+                    if (onRetry != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onRetry,
+                            modifier = Modifier.size(24.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "重试任务",
+                                modifier = Modifier.size(16.dp),
+                                tint = MiuixTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    if (onDelete != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(24.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "删除任务",
+                                modifier = Modifier.size(16.dp),
+                                tint = MiuixTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                } else if (onDelete != null && task.status == TaskStatusUi.Pending) {
                     Spacer(modifier = Modifier.width(4.dp))
                     IconButton(
                         onClick = onDelete,
@@ -360,6 +391,7 @@ fun TaskTriTabDashboard(
     onSteeringInputChange: (String) -> Unit,
     onSendSteering: () -> Unit,
     onDeleteTask: (String) -> Unit,
+    onRetryTask: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     isFloatingOverlay: Boolean = false,
 ) {
@@ -510,6 +542,7 @@ fun TaskTriTabDashboard(
                                 task = task,
                                 isCompact = true,
                                 onDelete = { onDeleteTask(task.taskId) },
+                                onRetry = { onRetryTask(task.taskId) },
                             )
                         }
                     }
