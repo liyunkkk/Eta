@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class EtaDatabaseMigrationTest {
     @Test
-    fun migration6To22PreservesDataAndMovesCompleteConversationContext() {
+    fun migration6To23PreservesDataAndMovesCompleteConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
@@ -56,6 +56,7 @@ class EtaDatabaseMigrationTest {
                 EtaDatabase.MIGRATION_19_20,
                 EtaDatabase.MIGRATION_20_21,
                 EtaDatabase.MIGRATION_21_22,
+                EtaDatabase.MIGRATION_22_23,
             )
             .build()
         try {
@@ -146,6 +147,43 @@ class EtaDatabaseMigrationTest {
                 assertNotNull(fetched)
                 assertEquals("测试任务", fetched?.title)
                 assertEquals(TaskQueueStatus.PENDING, fetched?.status)
+                assertEquals("[]", fetched?.attachmentsJson)
+
+                // v22 建表时没有 attachments_json，v23 迁移补列时必须带默认值，
+                // 否则旧库里已有的历史任务在升版后读取会直接抛 NOT NULL 约束错误。
+                database.openHelper.writableDatabase.execSQL(
+                    "INSERT INTO agent_task_queue " +
+                        "(task_id, conversation_id, title, prompt, order_index, status, created_at) " +
+                        "VALUES ('task-legacy', 'conv-1', '旧任务', '旧指令', 1, 'FAILED', 2000)"
+                )
+                val legacyAttachments = database.openHelper.readableDatabase
+                    .query("SELECT attachments_json FROM agent_task_queue WHERE task_id = 'task-legacy'")
+                    .use { cursor ->
+                        check(cursor.moveToFirst())
+                        cursor.getString(0)
+                    }
+                assertEquals("[]", legacyAttachments)
+                val legacyDecoded = TaskAttachmentCodec.decode(legacyAttachments)
+                assertEquals(emptyList<TaskAttachment>(), legacyDecoded)
+
+                // 失败任务重编辑：乐观锁限定 status='FAILED'，成功后回到 PENDING。
+                val edited = database.taskQueueDao().retryFailedTask(
+                    taskId = "task-legacy",
+                    title = "重试任务",
+                    prompt = "重试指令",
+                    attachmentsJson = TaskAttachmentCodec.encode(
+                        listOf(TaskAttachment.image("data:image/png;base64,AAAA")),
+                    ),
+                )
+                assertEquals(1, edited)
+                val retried = database.taskQueueDao().getTask("task-legacy")
+                assertEquals(TaskQueueStatus.PENDING, retried?.status)
+                assertEquals("重试任务", retried?.title)
+                assertEquals(1, TaskAttachmentCodec.decode(retried?.attachmentsJson).size)
+                // 已完成的任务不可被重试（保持幂等，避免重复投递）。
+                assertEquals(0, database.taskQueueDao().retryFailedTask("task-test-1", "x", "y", "[]"))
+                // resetFailedTask 同样不作用于非 FAILED 记录。
+                assertEquals(0, database.taskQueueDao().resetFailedTask("task-test-1"))
             }
         } finally {
             database.close()
