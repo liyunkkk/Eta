@@ -370,6 +370,8 @@ private fun AgentChatScaffold(
                 taskQueueState = taskQueueState,
                 onSteerTask = onSteerTask,
                 onDeleteTask = onDeleteTask,
+                onRetryTask = onRetryTask,
+                onEditTask = onEditTask,
             )
         },
     ) { innerPadding ->
@@ -918,6 +920,8 @@ private fun AgentChatBottomBar(
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
+    onRetryTask: (String) -> Unit = {},
+    onEditTask: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier

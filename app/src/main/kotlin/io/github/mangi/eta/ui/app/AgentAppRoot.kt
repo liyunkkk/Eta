@@ -342,7 +342,7 @@ fun AgentAppRoot(
                                         messageRegenerateTarget = MessageMutationTarget(action.id, impact.laterTurnCount)
                                     }
                                 }
-                                is AgentHomeAction.ForkResendMessage -> agentState.forkResendFromMessage(action.id)
+                                is AgentHomeAction.ForkResendMessage -> agentState.forkResendFromMessage(action.messageId)
                                 is AgentHomeAction.SelectReplyCandidate -> agentState.selectReplyCandidate(action.id, action.index)
                                 AgentHomeAction.OpenTools -> pushRoute(AppRoute.Tools)
                                 AgentHomeAction.OpenSkills -> pushRoute(AppRoute.Skills)
@@ -406,7 +406,7 @@ fun AgentAppRoot(
                                         messageRegenerateTarget = MessageMutationTarget(action.id, impact.laterTurnCount)
                                     }
                                 }
-                                is AgentChatAction.ForkResendMessage -> agentState.forkResendFromMessage(action.id)
+                                is AgentChatAction.ForkResendMessage -> agentState.forkResendFromMessage(action.messageId)
                                 is AgentChatAction.SelectReplyCandidate -> agentState.selectReplyCandidate(action.id, action.index)
                                 is AgentChatAction.EnqueueTask -> agentState.enqueueTask(action.taskText)
                                 is AgentChatAction.SteerActiveTask -> agentState.steerActiveTask(action.instruction)

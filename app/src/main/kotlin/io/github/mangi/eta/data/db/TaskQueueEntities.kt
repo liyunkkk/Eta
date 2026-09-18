@@ -53,7 +53,7 @@ internal data class TaskQueueEntity(
  * 单独抽成可序列化的小结构，便于 DAO 存储与单元测试。
  */
 @Serializable
-internal data class TaskAttachment(
+data class TaskAttachment(
     /** "image" 或 "file"。 */
     val kind: String,
     /** 图片为 dataUrl；文件为绝对路径或工作区引用。 */

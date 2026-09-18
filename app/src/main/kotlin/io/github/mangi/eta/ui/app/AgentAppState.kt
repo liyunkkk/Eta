@@ -2896,9 +2896,11 @@ internal class AgentAppState(
 
     fun enqueueTask(taskText: String) {
         val conversationId = ensureSelectedConversationId()
+        val title = taskText.take(24).lines().firstOrNull()?.trim().orEmpty().ifBlank { "任务" }
         scope.launch {
             taskManager.enqueueTask(
                 conversationId = conversationId,
+                title = title,
                 prompt = taskText,
                 attachments = taskAttachmentsFromPending(),
             )
