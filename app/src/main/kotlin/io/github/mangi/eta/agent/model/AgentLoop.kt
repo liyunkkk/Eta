@@ -93,7 +93,7 @@ internal class AgentLoop(
             publishTranscript()
             context.compact(roundTools)
             val rawRequestMessages = roleplayContext?.projectMessages(messages, roundTools) ?: messages
-            val requestMessages = DynamicContextOptimizer.optimize(rawRequestMessages, roundTools)
+            var requestMessages = DynamicContextOptimizer.optimize(rawRequestMessages, roundTools)
             var requestEstimate = AgentContextBudget.rawEstimate(requestMessages, roundTools)
             var roundInputTokens: Int? = null
             var overflowAttempts = 0
@@ -133,7 +133,8 @@ internal class AgentLoop(
                         overflowAttempts++
                         accumulatedReasoning.setLength(reasoningLengthBeforeRound)
                         context.compact(roundTools, force = true)
-                        requestMessages = roleplayContext?.projectMessages(messages, roundTools) ?: messages
+                        val retryRaw = roleplayContext?.projectMessages(messages, roundTools) ?: messages
+                        requestMessages = DynamicContextOptimizer.optimize(retryRaw, roundTools)
                         requestEstimate = AgentContextBudget.rawEstimate(requestMessages, roundTools)
                         roundInputTokens = null
                         round++
