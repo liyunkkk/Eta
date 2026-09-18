@@ -114,6 +114,50 @@ jobs:
           --tests io.github.mangi.eta.data.db.TaskAttachmentCodecTest
           --tests io.github.mangi.eta.data.db.EtaDatabaseMigrationTest
 
+      - name: 单元测试报告汇总（防过滤静默命中）
+        run: |
+          python3 - <<'PY'
+          import glob, os, sys, xml.etree.ElementTree as ET
+
+          files = sorted(glob.glob("app/build/test-results/testDebugUnitTest/*.xml"))
+          if not files:
+              print("::error::未找到测试报告，定向测试疑似未真正执行。")
+              sys.exit(1)
+
+          total = fails = errors = skipped = 0
+          seen = []
+          for path in files:
+              root = ET.parse(path).getroot()
+              name = root.get("name", os.path.basename(path))
+              t = int(root.get("tests", 0))
+              f = int(root.get("failures", 0))
+              e = int(root.get("errors", 0))
+              s = int(root.get("skipped", 0))
+              total += t; fails += f; errors += e; skipped += s
+              seen.append(name)
+              print(f"{t:>4} 用例  {f} 失败  {e} 错误  {s} 跳过  {name}")
+
+          print(f"\n合计 {total} 用例 / {fails} 失败 / {errors} 错误 / {skipped} 跳过")
+
+          # 强制校验：本轮新增的测试类必须真实出现在报告中，否则视为过滤未命中。
+          required = [
+              "io.github.mangi.eta.data.db.TaskAttachmentCodecTest",
+              "io.github.mangi.eta.data.db.EtaDatabaseMigrationTest",
+              "io.github.mangi.eta.agent.kimi.KimiWebEndpointTest",
+              "io.github.mangi.eta.agent.kimi.KimiWebApiClientTest",
+              "io.github.mangi.eta.agent.kimi.KimiWebServiceTest",
+          ]
+          missing = [r for r in required if r not in seen]
+          if missing:
+              print("::error::以下测试类未产生结果，--tests 过滤可能未命中：" + ", ".join(missing))
+              sys.exit(1)
+
+          fq = fails + errors
+          if fq:
+              print(f"::error::单元测试存在 {fq} 个失败/错误。")
+              sys.exit(1)
+          PY
+
       - name: 构建 Debug APK
         run: >-
           ./gradlew --no-daemon --no-configuration-cache
