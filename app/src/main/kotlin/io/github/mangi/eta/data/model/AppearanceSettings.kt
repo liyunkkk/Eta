@@ -18,10 +18,22 @@ data class AppearanceSettings(
     val swipeDismissEnabled: Boolean = true,
     val predictiveBackEnabled: Boolean = true,
     val interfaceScale: Float = DEFAULT_INTERFACE_SCALE,
+    val visualStyle: AppearanceVisualStyle = AppearanceVisualStyle.SIRI,
 ) {
     fun normalized(): AppearanceSettings = copy(
         interfaceScale = normalizeInterfaceScale(interfaceScale),
     )
+}
+
+@Serializable
+enum class AppearanceVisualStyle(val persistedValue: String) {
+    DEFAULT("default"),
+    SIRI("siri");
+
+    companion object {
+        fun fromPersistedValue(value: String?): AppearanceVisualStyle =
+            entries.firstOrNull { it.persistedValue == value } ?: SIRI
+    }
 }
 
 @Serializable
