@@ -22,16 +22,15 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
  * 其余沿用 Miuix 默认值，避免破坏 Miuix 内部对比度契约。
  */
 
-// ---- Siri 去污染色板（浅色态，源自设计规格文档） ----
-private val SiriLightTop = Color(0xFFEDF5FA)      // 顶部 青白
-private val SiriLightBottom = Color(0xFFDFD6DA)   // 下部 粉白
-private val SiriLightCard = Color(0xFFFFFFFF)     // 卡片 / 气泡
-private val SiriLightTextPrimary = Color(0xFF1C1C1E)
-private val SiriLightTextSecondary = Color(0xFF8A8A8E)
-private val SiriAccentTeal = Color(0xFF2FA79B)    // Siri 青（主 accent，去污染后偏青）
+// ---- Siri 浅色态色板（基准：Apple_HIG_设计基准.md） ----
+private val SiriLightBg = Color(0xFFF8F9FA)       // 页面底色 暖白
+private val SiriLightCard = Color(0xFFFFFFFF)     // 卡片（设置页等实底面）
+private val SiriLightTextPrimary = Color(0xFF171717)   // neutral-900
+private val SiriLightTextSecondary = Color(0xFF737373) // neutral-500
+private val SiriAccentTeal = Color(0xFF2FA79B)    // Siri 青（主 accent）
 
-// ---- Siri 深色态（按 iOS 暗色规范推导，装机验证） ----
-private val SiriDarkBg = Color(0xFF0A0A0C)
+// ---- Siri 深色态（按浅色同结构降明度推导） ----
+private val SiriDarkBg = Color(0xFF0B0C0E)        // 与 SiriBackdrop.darkBase 一致
 private val SiriDarkSurface = Color(0xFF1C1C1E)
 private val SiriDarkSurfaceHigh = Color(0xFF2C2C2E)
 private val SiriDarkTextPrimary = Color(0xFFFFFFFF)
@@ -45,7 +44,7 @@ fun siriLightColors(): Colors = lightColorScheme().copy(
     onPrimaryContainer = SiriLightTextPrimary,
     secondaryContainer = SiriLightCard,
     onSecondaryContainer = SiriLightTextPrimary,
-    background = SiriLightTop,
+    background = SiriLightBg,
     onBackground = SiriLightTextPrimary,
     surface = SiriLightCard,
     onSurface = SiriLightTextPrimary,

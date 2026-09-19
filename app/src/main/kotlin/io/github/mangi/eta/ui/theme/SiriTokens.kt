@@ -2,6 +2,9 @@ package io.github.mangi.eta.ui.theme
 
 import androidx.compose.animation.core.Easing
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -50,44 +53,84 @@ object SiriGlass {
     val edgeDark = Color(0x1AFFFFFF) // 10%
 }
 
-/** Siri 渐变底。自上而下：青白 → 淡青绿 → 青 → 青蓝 → 粉白。 */
+/**
+ * Apple Intelligence 弥散光晕底。
+ *
+ * 基准：参考源码/siri_ui_ref/Apple_HIG_设计基准.md（Gemini 读原视频提炼）。
+ * 上半部分柔和弥散光晕：顶部淡薄荷绿 → 中部淡天蓝 → 自然淡出至底部暖白。
+ * 非生硬线性多段渐变，而是低饱和、大范围的弥散感。
+ */
 object SiriBackdrop {
-    private val lightTop = Color(0xFFEDF5FA)
-    private val lightUpperMid = Color(0xFFB6C9B9)
-    private val lightMid = Color(0xFF9CBEB4)
-    private val lightLowerMid = Color(0xFFA6BECB)
-    private val lightBottom = Color(0xFFDFD6DA)
+    // 浅色态：底部暖白，顶部薄荷绿 + 天蓝弥散光晕。
+    private val lightBase = Color(0xFFF8F9FA)      // 底部暖灰/米白
+    private val lightMint = Color(0xFFD2F5E3)      // 顶部淡薄荷绿
+    private val lightSky = Color(0xFFE3F2FD)       // 中部淡天蓝
 
-    private val darkTop = Color(0xFF0A0A0C)
-    private val darkUpperMid = Color(0xFF14181A)
-    private val darkMid = Color(0xFF161C1E)
-    private val darkLowerMid = Color(0xFF141A1E)
-    private val darkBottom = Color(0xFF1A1418)
+    // 深色态：近黑底，顶部暗青 + 暗蓝弥散光晕（按浅色同结构降明度推导）。
+    private val darkBase = Color(0xFF0B0C0E)       // 底部近黑
+    private val darkMint = Color(0xFF14201B)       // 顶部暗薄荷
+    private val darkSky = Color(0xFF141B22)        // 中部暗蓝
 
+    /**
+     * 浅色弥散光晕：三段柔和垂直渐变，光晕集中在顶部、向下淡出至暖白。
+     * 通过让中间停靠更靠上 + 底部大段同色，模拟「光晕向上弥散、向下消失」。
+     */
     fun lightBrush(): Brush = Brush.verticalGradient(
         colorStops = arrayOf(
-            0.00f to lightTop,
-            0.28f to lightUpperMid,
-            0.50f to lightMid,
-            0.72f to lightLowerMid,
-            1.00f to lightBottom,
+            0.00f to lightMint,
+            0.30f to lightSky,
+            0.62f to lightBase,
+            1.00f to lightBase,
         ),
     )
 
     fun darkBrush(): Brush = Brush.verticalGradient(
         colorStops = arrayOf(
-            0.00f to darkTop,
-            0.28f to darkUpperMid,
-            0.50f to darkMid,
-            0.72f to darkLowerMid,
-            1.00f to darkBottom,
+            0.00f to darkMint,
+            0.30f to darkSky,
+            0.62f to darkBase,
+            1.00f to darkBase,
         ),
     )
 
     fun brush(isDark: Boolean): Brush = if (isDark) darkBrush() else lightBrush()
 
     /** 底部纯背景色（无渐变时的兜底）。 */
-    fun fallbackColor(isDark: Boolean): Color = if (isDark) darkTop else lightTop
+    fun fallbackColor(isDark: Boolean): Color = if (isDark) darkBase else lightBase
+}
+
+/**
+ * Apple Intelligence 弥散光晕背景 Modifier。
+ *
+ * 在暖白/近黑底上叠加顶部两个大范围径向光晕（薄荷绿 + 天蓝），
+ * 光晕自顶部向下、向两侧柔和弥散，淡出至底色——比线性分段更接近原型的「弥散光晕」。
+ * 仅 SIRI 模式由聊天舞台根容器调用；DEFAULT 不加。
+ */
+fun Modifier.siriBackdrop(isDark: Boolean): Modifier = this.drawBehind {
+    val base = SiriBackdrop.fallbackColor(isDark)
+    drawRect(base)
+
+    val w = size.width
+    val h = size.height
+    val mint = if (isDark) Color(0xFF14201B) else Color(0xFFD2F5E3)
+    val sky = if (isDark) Color(0xFF141B22) else Color(0xFFD9ECFF)
+
+    // 顶部薄荷绿光晕：覆盖顶部横带，向下柔和淡出。
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(mint.copy(alpha = 0.95f), mint.copy(alpha = 0.45f), Color.Transparent),
+            center = Offset(x = w * 0.30f, y = h * 0.02f),
+            radius = h * 0.75f,
+        ),
+    )
+    // 中部偏右天蓝光晕：与薄荷绿交叠，向右下弥散。
+    drawRect(
+        brush = Brush.radialGradient(
+            colors = listOf(sky.copy(alpha = 0.9f), sky.copy(alpha = 0.4f), Color.Transparent),
+            center = Offset(x = w * 0.78f, y = h * 0.30f),
+            radius = h * 0.7f,
+        ),
+    )
 }
 
 /** 文字与图标色。 */

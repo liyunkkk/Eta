@@ -92,8 +92,8 @@ import io.github.mangi.eta.ui.model.ToolActivityMessageUi
 import io.github.mangi.eta.ui.model.ToolSummaryMessageUi
 import io.github.mangi.eta.ui.model.UserMessageUi
 import io.github.mangi.eta.ui.model.latestContextUsage
-import io.github.mangi.eta.ui.theme.SiriBackdrop
 import io.github.mangi.eta.ui.theme.SiriGlass
+import io.github.mangi.eta.ui.theme.siriBackdrop
 import kotlin.math.exp
 import kotlin.math.min
 import kotlinx.coroutines.CancellationException
@@ -440,7 +440,7 @@ internal fun AgentConversationMessages(
     modifier: Modifier = Modifier,
 ) {
     val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
-    val backdropBrush = if (isSiriStyle) SiriBackdrop.brush(isSystemInDarkTheme()) else null
+    val siriDark = isSystemInDarkTheme()
     val timelineEntries = remember(visibleMessages) { visibleMessages.toTimelineEntries() }
     // 复制按钮只出现在每轮对话的最终结果上，中间步骤的过渡文本不提供复制入口。
     // 流式进行中当前这一轮尚未收尾，此时的“最后一条正文”只是中间步骤，不标记。
@@ -637,7 +637,7 @@ internal fun AgentConversationMessages(
     Box(
         modifier = modifier
             .clipToBounds()
-            .then(if (backdropBrush != null) Modifier.background(backdropBrush) else Modifier),
+            .then(if (isSiriStyle) Modifier.siriBackdrop(siriDark) else Modifier),
     ) {
         val safeTimelineEntries = remember(timelineEntries) { timelineEntries.distinctBy { it.key } }
         LazyColumn(
