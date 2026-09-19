@@ -15,6 +15,7 @@ import io.github.mangi.eta.data.model.AppearancePaletteStyle
 import io.github.mangi.eta.data.model.AppearanceSettings
 import io.github.mangi.eta.data.model.AppearanceThemeMode
 import io.github.mangi.eta.data.model.AppearanceTopBarBlurStyle
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.data.model.Settings
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
@@ -42,6 +43,7 @@ internal object SettingsDataStore {
     private val APPEARANCE_PREDICTIVE_BACK_ENABLED =
         booleanPreferencesKey("appearance_predictive_back_enabled")
     private val APPEARANCE_INTERFACE_SCALE = floatPreferencesKey("appearance_interface_scale")
+    private val APPEARANCE_VISUAL_STYLE = stringPreferencesKey("appearance_visual_style")
     private const val SELECTED_MODEL_BY_PROVIDER_PREFIX = "selected_model_id_by_provider."
     private const val SELECTED_TRANSLATION_MODEL_BY_PROVIDER_PREFIX = "selected_translation_model_id_by_provider."
 
@@ -269,6 +271,7 @@ internal object SettingsDataStore {
             swipeDismissEnabled = this[APPEARANCE_SWIPE_DISMISS_ENABLED] ?: true,
             predictiveBackEnabled = this[APPEARANCE_PREDICTIVE_BACK_ENABLED] ?: true,
             interfaceScale = this[APPEARANCE_INTERFACE_SCALE] ?: 1f,
+            visualStyle = AppearanceVisualStyle.fromPersistedValue(this[APPEARANCE_VISUAL_STYLE]),
         ).normalized(),
     )
 
@@ -283,5 +286,6 @@ internal object SettingsDataStore {
         this[APPEARANCE_SWIPE_DISMISS_ENABLED] = settings.swipeDismissEnabled
         this[APPEARANCE_PREDICTIVE_BACK_ENABLED] = settings.predictiveBackEnabled
         this[APPEARANCE_INTERFACE_SCALE] = settings.interfaceScale
+        this[APPEARANCE_VISUAL_STYLE] = settings.visualStyle.persistedValue
     }
 }
