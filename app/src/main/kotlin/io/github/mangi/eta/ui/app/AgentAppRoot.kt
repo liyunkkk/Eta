@@ -220,6 +220,7 @@ fun AgentAppRoot(
             conversationPaneState = agentState.conversationPaneState,
             isConversationPaneOpen = conversationPaneOpen,
             homeTitle = agentState.currentConversationTitle(),
+            homeModelName = agentState.modelPickerState.selectedModel?.displayName.orEmpty(),
             onBack = { popRoute() },
             onOpenConversationPane = { conversationPaneOpen = true },
             onDismissConversationPane = { conversationPaneOpen = false },

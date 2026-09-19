@@ -14,8 +14,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,7 +98,6 @@ import io.github.mangi.eta.ui.model.UserMessageUi
 import io.github.mangi.eta.ui.model.latestContextUsage
 import io.github.mangi.eta.ui.theme.SiriGlass
 import io.github.mangi.eta.ui.theme.SiriShapes
-import io.github.mangi.eta.ui.theme.siriBackdrop
 import kotlin.math.exp
 import kotlin.math.min
 import kotlinx.coroutines.CancellationException
@@ -442,8 +443,6 @@ internal fun AgentConversationMessages(
     currentBrowserMessageId: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
-    val siriDark = isSystemInDarkTheme()
     val timelineEntries = remember(visibleMessages) { visibleMessages.toTimelineEntries() }
     // 复制按钮只出现在每轮对话的最终结果上，中间步骤的过渡文本不提供复制入口。
     // 流式进行中当前这一轮尚未收尾，此时的“最后一条正文”只是中间步骤，不标记。
@@ -639,8 +638,7 @@ internal fun AgentConversationMessages(
     // afterContentPadding，确保跟到底部时最后一行停在输入器上方。
     Box(
         modifier = modifier
-            .clipToBounds()
-            .then(if (isSiriStyle) Modifier.siriBackdrop(siriDark) else Modifier),
+            .clipToBounds(),
     ) {
         val safeTimelineEntries = remember(timelineEntries) { timelineEntries.distinctBy { it.key } }
         LazyColumn(
@@ -1140,41 +1138,38 @@ private fun EmptyChatState(
     )
 
     Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(bottom = 56.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (isCharacterConversation) {
+        if (isSiriStyle) {
+            // Apple Intelligence 空态：Hero 居中，建议 chips 贴输入框上方横排滚动。
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(bottom = 120.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text(
-                    text = characterName.orEmpty(),
+                    text = if (isCharacterConversation) {
+                        characterName.orEmpty()
+                    } else {
+                        stringResource(R.string.ui_how_can_i_help_you_e75391)
+                    },
                     style = MiuixTheme.textStyles.title2,
                     color = MiuixTheme.colorScheme.onSurface,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "故事从这里开始",
+                    text = if (isCharacterConversation) {
+                        "故事从这里开始"
+                    } else {
+                        stringResource(R.string.siri_hero_subtitle)
+                    },
                     style = MiuixTheme.textStyles.body2,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(max = 320.dp),
                 )
-            } else {
-                if (isSiriStyle) {
-                    // Apple Intelligence Hero：大标题 + 副文案 + Try it 白胶囊。
-                    Text(
-                        text = stringResource(R.string.ui_how_can_i_help_you_e75391),
-                        style = MiuixTheme.textStyles.title2,
-                        color = MiuixTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = stringResource(R.string.siri_hero_subtitle),
-                        style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.widthIn(max = 320.dp),
-                    )
+                if (!isCharacterConversation) {
                     Spacer(modifier = Modifier.height(18.dp))
+                    // Try it 白胶囊。
                     Box(
                         modifier = Modifier
                             .clip(SiriShapes.full)
@@ -1193,6 +1188,59 @@ private fun EmptyChatState(
                             color = MiuixTheme.colorScheme.onSurface,
                         )
                     }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = showSuggestions && !isCharacterConversation,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(animationSpec = tween(durationMillis = 220)) + slideInVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                    initialOffsetY = { it / 3 },
+                ),
+                exit = fadeOut(animationSpec = tween(durationMillis = 130)) + slideOutVertically(
+                    animationSpec = tween(durationMillis = 180),
+                    targetOffsetY = { it / 4 },
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    suggestions.forEach { item ->
+                        SuggestionCard(
+                            item = item,
+                            onClick = { onSuggestionClick(item.prompt) },
+                            modifier = Modifier.width(150.dp),
+                        )
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(bottom = 56.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (isCharacterConversation) {
+                    Text(
+                        text = characterName.orEmpty(),
+                        style = MiuixTheme.textStyles.title2,
+                        color = MiuixTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "故事从这里开始",
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
                 } else {
                     Text(
                         text = stringResource(R.string.ui_how_can_i_help_you_e75391),
@@ -1200,40 +1248,40 @@ private fun EmptyChatState(
                         color = MiuixTheme.colorScheme.onSurface,
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(30.dp))
 
-            AnimatedVisibility(
-                visible = showSuggestions && !isCharacterConversation,
-                enter = fadeIn(
-                    animationSpec = tween(durationMillis = 220)
-                ) + slideInVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
+                AnimatedVisibility(
+                    visible = showSuggestions && !isCharacterConversation,
+                    enter = fadeIn(
+                        animationSpec = tween(durationMillis = 220)
+                    ) + slideInVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                        initialOffsetY = { it / 3 },
                     ),
-                    initialOffsetY = { it / 3 },
-                ),
-                exit = fadeOut(
-                    animationSpec = tween(durationMillis = 130)
-                ) + slideOutVertically(
-                    animationSpec = tween(durationMillis = 180),
-                    targetOffsetY = { it / 4 },
-                ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    exit = fadeOut(
+                        animationSpec = tween(durationMillis = 130)
+                    ) + slideOutVertically(
+                        animationSpec = tween(durationMillis = 180),
+                        targetOffsetY = { it / 4 },
+                    ),
                 ) {
-                    suggestions.chunked(2).forEach { rowItems ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            rowItems.forEach { item ->
-                                SuggestionCard(
-                                    item = item,
-                                    onClick = { onSuggestionClick(item.prompt) },
-                                    modifier = Modifier.weight(1f),
-                                )
+                    Column(
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        suggestions.chunked(2).forEach { rowItems ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                rowItems.forEach { item ->
+                                    SuggestionCard(
+                                        item = item,
+                                        onClick = { onSuggestionClick(item.prompt) },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
                             }
                         }
                     }

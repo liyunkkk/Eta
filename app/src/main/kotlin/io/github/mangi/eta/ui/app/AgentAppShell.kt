@@ -1,5 +1,6 @@
 package io.github.mangi.eta.ui.app
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddComment
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Create
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Menu
@@ -36,6 +38,7 @@ import io.github.mangi.eta.ui.components.TopBarBackdrop
 import io.github.mangi.eta.ui.components.captureForTopBar
 import io.github.mangi.eta.ui.components.rememberTopBarBackdrop
 import io.github.mangi.eta.ui.components.topBarContainerColor
+import io.github.mangi.eta.ui.theme.siriBackdrop
 import io.github.mangi.eta.ui.model.ConversationPaneUiState
 import io.github.mangi.eta.ui.model.ConversationSummaryUi
 import io.github.mangi.eta.ui.navigation.AppRoute
@@ -49,6 +52,8 @@ import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowListPopup
 
 /**
@@ -66,6 +71,7 @@ fun AgentAppShell(
     conversationPaneState: ConversationPaneUiState?,
     isConversationPaneOpen: Boolean,
     homeTitle: String = "",
+    homeModelName: String = "",
     onBack: () -> Unit,
     onOpenConversationPane: () -> Unit,
     onDismissConversationPane: () -> Unit,
@@ -93,10 +99,15 @@ fun AgentAppShell(
 ) {
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberTopBarBackdrop()
-    val topBarColor = topBarContainerColor(backdrop)
+    // SIRI 风格：整屏弥散光晕由壳层承载，覆盖顶栏/空态/消息流/输入栏。
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
+    // SIRI 顶栏必须完全透出下层光晕，不能保留 surface 实底。
+    val topBarColor = if (isSiriStyle) Color.Transparent else topBarContainerColor(backdrop)
     val pageContent: @Composable () -> Unit = {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            containerColor = if (isSiriStyle) Color.Transparent else MiuixTheme.colorScheme.surface,
             contentWindowInsets = WindowInsets.safeDrawing.only(
                 WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
             ),
@@ -106,6 +117,7 @@ fun AgentAppShell(
                         AgentTopBar(
                             route = currentRoute,
                             homeTitle = homeTitle,
+                            homeModelName = homeModelName,
                             scrollBehavior = scrollBehavior,
                             color = topBarColor,
                             onBack = onBack,
@@ -134,7 +146,11 @@ fun AgentAppShell(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .then(if (isSiriStyle) Modifier.siriBackdrop(siriDark) else Modifier),
+    ) {
         if (conversationPaneState != null && currentRoute is AppRoute.Home) {
             ConversationSidePaneScaffold(
                 state = conversationPaneState,
@@ -166,6 +182,7 @@ fun AgentAppShell(
 private fun AgentTopBar(
     route: AppRoute?,
     homeTitle: String,
+    homeModelName: String,
     scrollBehavior: ScrollBehavior,
     color: Color,
     onBack: () -> Unit,
@@ -219,8 +236,10 @@ private fun AgentTopBar(
 
     if (isHome) {
         // 首页聊天舞台保持紧凑；二级内容页统一使用可折叠大标题。
+        // SIRI 风格：标题居中显示当前模型名 + 右箭头，左汉堡、右新建对话。
+        val siriTitle = if (isSiriStyle && homeModelName.isNotBlank()) "$homeModelName ›" else null
         SmallTopAppBar(
-            title = homeTitle.ifBlank { titleForRoute(route) },
+            title = siriTitle ?: homeTitle.ifBlank { titleForRoute(route) },
             color = color,
             scrollBehavior = scrollBehavior,
             navigationIcon = navigationIcon,
