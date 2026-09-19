@@ -1,16 +1,21 @@
 package io.github.mangi.eta.ui.components
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
 import io.github.mangi.eta.ui.theme.EtaStroke
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.CardColors
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.squircle.squircleBorder
+import top.yukonga.miuix.kmp.squircle.SquircleDefaults
+import top.yukonga.miuix.kmp.squircle.addSquircleRect
+import top.yukonga.miuix.kmp.squircle.isSquircleEnabled
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
@@ -25,13 +30,17 @@ import top.yukonga.miuix.kmp.utils.PressFeedbackType
  * 为 `0xFFF7F7F7`，两者仅差 8 级灰度且无描边，卡片边界在视觉上完全消失。
  * 本组件在卡片边界补一条 `outline` 描边，恢复卡片轮廓。
  *
- * 实现要点：
- * - 调用方 `modifier` **原样传给 Miuix `Card`**，尺寸/间距/对齐语义与改造前逐字一致，
- *   不引入任何布局行为变化。
- * - 描边由 `Box` 内一层 `matchParentSize()` 的覆盖层绘制。该 `Box` 自身不带 modifier、
- *   只包裹这一张卡片，因此其内容区恒等于卡片尺寸，描边恰好落在卡片真实边界上，
- *   不偏移、不外扩、不改变任何既有尺寸。
- * - 内部仍委托 Miuix `Card`，保留 `LocalContentColor` 注入、按压反馈与点击语义，行为与原来一致。
+ * 实现要点（**不得再改动**）：
+ * - 调用方 `modifier` **原样、无包裹地**传给 Miuix `Card`。绝不允许在中间插入任何
+ *   布局容器（`Box` / `Column` 等）：`Modifier.weight(...)` / `fillMaxHeight()` /
+ *   `align(...)` 都是 **ParentData** 修饰符，只在「直接父节点是对应作用域」时才生效。
+ *   一旦被容器隔断，`weight` 会被静默丢弃，导致多列网格退化为单列、行高错乱。
+ * - 描边以 `drawWithContent` 追加在 `modifier` 链上，在卡片**自身绘制完成后**再画，
+ *   因此必定位于卡片底色之上（Miuix 的 `squircleBorder` 用的是 `onDrawBehind`，
+ *   直接挂在卡片 modifier 上会被 `squircleSurface` 的底色完全覆盖，故不可用）。
+ * - `drawWithContent` 是纯绘制修饰符，不参与测量与布局，不改变任何既有尺寸与位置。
+ * - 描边路径与 `squircleSurface` 使用同一套几何参数（`addSquircleRect` +
+ *   `SquircleDefaults.Extension` + `isSquircleEnabled()` 回退），因此与卡片轮廓严格对齐。
  * - 卡片底色仍为不透明的 `surfaceContainer`，不引入透明或模糊，二级页纯白底约定不变。
  *
  * 参数与 [MiuixCard] 的两个重载一一对应，各页面用 import 别名即可无缝切换。
@@ -47,22 +56,21 @@ fun EtaCard(
     colors: CardColors = CardDefaults.defaultColors(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    CardOutline(cornerRadius = cornerRadius) {
-        MiuixCard(
-            modifier = modifier,
-            cornerRadius = cornerRadius,
-            insideMargin = insideMargin,
-            colors = colors,
-            content = content,
-        )
-    }
+    MiuixCard(
+        modifier = modifier.etaCardOutline(cornerRadius),
+        cornerRadius = cornerRadius,
+        insideMargin = insideMargin,
+        colors = colors,
+        content = content,
+    )
 }
 
 /**
  * 可点击的 Eta 统一卡片，对应 [MiuixCard] 的交互重载。
  *
- * 描边画在卡片之上的覆盖层，按压反馈与点击语义仍由内层 Miuix Card 承担，
- * 因此 `pressFeedbackType` / `showIndication` / `holdDownState` 的既有观感不变。
+ * 描边同样以 `drawWithContent` 追加在 `modifier` 链上，按压反馈与点击语义仍由
+ * 内层 Miuix Card 承担，因此 `pressFeedbackType` / `showIndication` / `holdDownState`
+ * 的既有观感不变，且 `weight` / `fillMaxHeight` 等 ParentData 语义完整保留。
  */
 @Composable
 fun EtaCard(
@@ -77,48 +85,51 @@ fun EtaCard(
     onLongPress: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    CardOutline(cornerRadius = cornerRadius) {
-        MiuixCard(
-            modifier = modifier,
-            cornerRadius = cornerRadius,
-            insideMargin = insideMargin,
-            colors = colors,
-            pressFeedbackType = pressFeedbackType,
-            showIndication = showIndication,
-            holdDownState = holdDownState,
-            onClick = onClick,
-            onLongPress = onLongPress,
-            content = content,
-        )
-    }
+    MiuixCard(
+        modifier = modifier.etaCardOutline(cornerRadius),
+        cornerRadius = cornerRadius,
+        insideMargin = insideMargin,
+        colors = colors,
+        pressFeedbackType = pressFeedbackType,
+        showIndication = showIndication,
+        holdDownState = holdDownState,
+        onClick = onClick,
+        onLongPress = onLongPress,
+        content = content,
+    )
 }
 
 /**
- * 描边容器：调用方 modifier 原样交给卡片，描边由一层同尺寸覆盖层画在卡片之上。
+ * 在卡片自身绘制完成之后，把 hairline 描边画在最上层。
  *
- * 为什么必须叠加而不是挂在卡片自身的 modifier 上：
- * Miuix 的 `squircleBorder` 内部使用 `onDrawBehind`（画在**内容之下**），而 `Card` 的底色由
- * `squircleSurface` 在同一布局节点内填充。若把描边写进卡片自己的 modifier，描边会先被绘制、
- * 随后被卡片底色完全覆盖——框线在视觉上不可见。因此这里用 `matchParentSize` 的覆盖层把
- * 描边画在最上层。
- *
- * 该覆盖层不含任何指针输入修饰符，不参与命中测试，不会拦截卡片的点击与长按。
+ * 几何参数与 Miuix `squircleBorder` 保持逐字一致（内缩半个描边宽度、
+ * `extension` 取 [SquircleDefaults.Extension]、`squircleEnabled` 走
+ * [isSquircleEnabled] 回退），确保描边与 `squircleSurface` 的轮廓完全重合。
  */
 @Composable
-private fun CardOutline(
-    cornerRadius: Dp,
-    content: @Composable () -> Unit,
-) {
-    Box {
-        content()
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .squircleBorder(
-                    width = EtaStroke.hairline,
-                    color = MiuixTheme.colorScheme.outline,
-                    cornerRadius = cornerRadius,
-                ),
-        )
+private fun Modifier.etaCardOutline(cornerRadius: Dp): Modifier {
+    val squircleEnabled = isSquircleEnabled()
+    val outlineColor = MiuixTheme.colorScheme.outline
+    val strokeWidth = EtaStroke.hairline
+    return this.drawWithContent {
+        drawContent()
+        val widthPx = strokeWidth.toPx()
+        val cornerRadiusPx = cornerRadius.toPx()
+        val halfStroke = widthPx / 2f
+        val innerWidth = size.width - widthPx
+        val innerHeight = size.height - widthPx
+        if (widthPx > 0f && innerWidth > 0f && innerHeight > 0f) {
+            val path = Path()
+            path.addSquircleRect(
+                width = innerWidth,
+                height = innerHeight,
+                cornerRadius = (cornerRadiusPx - halfStroke).coerceAtLeast(0f),
+                extension = SquircleDefaults.Extension,
+                squircleEnabled = squircleEnabled,
+            )
+            translate(halfStroke, halfStroke) {
+                drawPath(path = path, color = outlineColor, style = Stroke(width = widthPx))
+            }
+        }
     }
 }
