@@ -29,13 +29,16 @@ internal fun rememberTopBarBackdrop(): LayerBackdrop? {
     if (!LocalBlurEnabled.current || !isRuntimeShaderSupported()) return null
     val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
     val isDark = isSystemInDarkTheme()
+    // 注意：rememberLayerBackdrop 的 onDraw 不是 @Composable 上下文，
+    // 颜色必须在组合期先取出来。
+    val surfaceColor = MiuixTheme.colorScheme.surface
     return rememberLayerBackdrop {
         if (isSiriStyle) {
             // SIRI：backdrop 底必须是弥散光晕，否则顶栏毛玻璃采样到不透明白底，
             // 表现为「顶部不透明」——这正是之前顶栏发白的根因。
             drawSiriBackdrop(isDark)
         } else {
-            drawRect(MiuixTheme.colorScheme.surface)
+            drawRect(surfaceColor)
         }
         drawContent()
     }
