@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddComment
+import androidx.compose.material.icons.rounded.Create
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.ui.components.AdaptiveTopAppBar
 import io.github.mangi.eta.ui.components.ConversationSidePaneScaffold
 import io.github.mangi.eta.ui.components.MiuixBackButton
@@ -178,6 +180,7 @@ private fun AgentTopBar(
     onOpenBrowser: () -> Unit,
 ) {
     val isHome = route is AppRoute.Home
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
     val navigationIcon: @Composable () -> Unit = {
         if (isHome) {
             IconButton(onClick = onOpenConversationPane) {
@@ -192,6 +195,15 @@ private fun AgentTopBar(
     }
     val actions: @Composable RowScope.() -> Unit = {
         if (isHome) {
+            if (isSiriStyle) {
+                // Apple Intelligence 顶栏右侧：微灰圆底新建对话（SquarePen）。
+                IconButton(onClick = onNewConversation) {
+                    Icon(
+                        imageVector = Icons.Rounded.Create,
+                        contentDescription = stringResource(R.string.action_new_conversation),
+                    )
+                }
+            }
             TopBarOverflowMenu(
                 onNewConversation = onNewConversation,
                 onOpenTerminal = onOpenTerminal,
