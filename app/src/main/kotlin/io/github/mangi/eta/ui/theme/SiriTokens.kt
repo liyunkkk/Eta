@@ -43,13 +43,10 @@ object SiriShapes {
     /**
      * 输入框 / 浮窗输入容器圆角。
      *
-     * 基准来自实机取证（非估算）：小米 13 (fuxi) 屏幕圆角
-     *   dumpsys display -> roundedCorners radius=118px，density=2.75
-     *   118 / 2.75 = 42.9dp -> 取 43dp
-     * 取代此前的全圆角药丸（percent = 50），使输入区圆角与系统屏幕圆角完全对齐：
-     * 单行时观感接近胶囊，多行拉高后自然过渡为大圆角矩形，不再是恒定半圆。
+     * 用户指定：25% 圆角（按容器短边计算），随高度自然缩放，
+     * 任何容器高度下都不会被半高截断成药丸。
      */
-    val field: RoundedCornerShape = RoundedCornerShape(43.dp)
+    val field: RoundedCornerShape = RoundedCornerShape(percent = 25)
 }
 
 /** 玻璃质感叠色与描边。 */

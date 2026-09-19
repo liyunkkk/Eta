@@ -67,8 +67,11 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 
 internal val ChatInputPopupMargin = 8.dp
-internal val ChatInputActionSize = 40.dp
-internal val ChatInputActionIconSize = 24.dp
+/** 输入栏操作按钮统一可见尺寸：32dp。IconButton 的 minWidth/minHeight 是点击区，
+ *  SIRI 模式玻璃面画在按钮边界上，故点击区即可见圆钮直径。 */
+internal val ChatInputActionSize = 32.dp
+/** 图标/可见圆钮尺寸：与 ChatInputActionSize 一致，保证输入栏所有圆钮直径相同。 */
+internal val ChatInputActionIconSize = 32.dp
 
 @Composable
 internal fun AgentAttachmentPickerButton(

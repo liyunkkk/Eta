@@ -231,16 +231,11 @@ internal fun AgentChatInputBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 问题1：min 84dp -> 88dp。43dp 圆角（SiriShapes.field）在高度 H 的容器上
-                    // 实际渲染半径 = min(43, H/2)，需 H > 86dp 才呈现「大圆角矩形」而非药丸；
-                    // 84dp 时半高 42dp < 43dp，几何上必然退化为药丸。主界面靠内容撑到
-                    // ~100dp 侥幸成立，浮窗内容较少时会落到 84dp 下限，故必须抬高保底。
-                    .heightIn(min = 88.dp)
+                    .heightIn(min = 84.dp)
                     .then(
                         if (isSiriStyle) {
-                            // 问题1：圆角与小米 13 屏幕圆角统一为 43dp
-                            // （实机取证：dumpsys display -> roundedCorners radius=118px，
-                            //  density=2.75，118/2.75=42.9dp）。液态玻璃质感保持不变。
+                            // 圆角：SiriShapes.field = 容器短边 25%，随高度自然缩放。
+                            // 液态玻璃质感保持不变。
                             Modifier
                                 .dropShadow(
                                     shape = SiriShapes.field,
