@@ -1263,19 +1263,36 @@ private fun SuggestionCard(
             .clickable(onClick = onClick)
             .padding(horizontal = 13.dp, vertical = 12.dp),
     ) {
-        Icon(
-            imageVector = item.icon,
-            contentDescription = null,
-            modifier = Modifier.size(17.dp),
-            tint = MiuixTheme.colorScheme.onBackground,
-        )
-        Spacer(modifier = Modifier.height(9.dp))
-        Text(
-            text = item.title,
-            style = MiuixTheme.textStyles.body2,
-            color = MiuixTheme.colorScheme.onSurface,
-            maxLines = 1,
-        )
+        if (isSiriStyle) {
+            // Apple Intelligence 建议 chip：粗体动词行 + 浅灰内容行（两行文）。
+            Text(
+                text = item.title,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = item.prompt,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+        } else {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = null,
+                modifier = Modifier.size(17.dp),
+                tint = MiuixTheme.colorScheme.onBackground,
+            )
+            Spacer(modifier = Modifier.height(9.dp))
+            Text(
+                text = item.title,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+        }
     }
 }
 
