@@ -8,8 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import io.github.mangi.eta.data.model.AppearanceTopBarBlurStyle
-import io.github.mangi.eta.data.model.AppearanceVisualStyle
-import io.github.mangi.eta.ui.app.LocalAppearanceSettings
+import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.app.LocalBlurEnabled
 import io.github.mangi.eta.ui.app.LocalTopBarBlurStyle
 import io.github.mangi.eta.ui.theme.drawSiriBackdrop
@@ -27,7 +26,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 internal fun rememberTopBarBackdrop(): LayerBackdrop? {
     if (!LocalBlurEnabled.current || !isRuntimeShaderSupported()) return null
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val isDark = isSystemInDarkTheme()
     // 注意：rememberLayerBackdrop 的 onDraw 不是 @Composable 上下文，
     // 颜色必须在组合期先取出来。
@@ -52,7 +51,7 @@ internal fun TopBarBackdrop(
     val surfaceColor = MiuixTheme.colorScheme.surface
     // SIRI 风格顶栏是覆盖在弥散光晕之上的毛玻璃，需大幅降低底色不透明度，
     // 否则整条白色实底会把顶部的薄荷绿光晕盖死。
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val surfaceAlpha = if (isSiriStyle) SiriTopBarSurfaceAlpha else TopBarSurfaceAlpha
     val progressiveAlpha = if (isSiriStyle) SiriProgressiveTopBarSurfaceAlpha else ProgressiveTopBarSurfaceAlpha
     val modifier = when {

@@ -83,8 +83,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import io.github.mangi.eta.ui.app.LocalAppearanceSettings
-import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.app.LocalSiriStage
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -367,7 +366,7 @@ private fun ConversationPanePanel(
     val groups = remember(state.conversations) { state.conversations.groupForDrawer() }
     val density = LocalDensity.current
     // 问题4：对话列表为独立功能面板，不要边界背景，整块统一纯白实底。
-    val isSiriPane = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriPane = LocalSiriStage.current
 
     Surface(
         modifier = modifier

@@ -44,8 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
-import io.github.mangi.eta.data.model.AppearanceVisualStyle
-import io.github.mangi.eta.ui.app.LocalAppearanceSettings
+import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.AgentModelOptionUi
 import io.github.mangi.eta.ui.model.AgentModelPickerUiState
@@ -85,7 +84,7 @@ internal fun AgentModelPickerButton(
     var showPopup by remember { mutableStateOf(false) }
     var expandedProviderIds by remember { mutableStateOf(emptySet<String>()) }
     val selected = state.selectedModel
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     val enabled = !isStreaming && !state.isChanging
     LaunchedEffect(enabled) {
@@ -337,7 +336,7 @@ internal fun AgentContextUsageButton(
 ) {
     val scope = rememberCoroutineScope()
     val tooltipState = rememberTooltipState(isPersistent = true)
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     val progress = usage.progress
     val progressColor = when {

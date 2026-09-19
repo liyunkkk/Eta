@@ -59,8 +59,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import io.github.mangi.eta.data.model.AppearanceVisualStyle
-import io.github.mangi.eta.ui.app.LocalAppearanceSettings
+import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -79,7 +78,7 @@ fun TaskStatusCapsuleBadge(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     Row(
         modifier = modifier

@@ -31,6 +31,25 @@ fun AgentAppTheme(
     appearance: AppearanceSettings,
     applyInterfaceScale: Boolean,
     onResolvedDarkModeChange: (Boolean) -> Unit = {},
+    /** 本主题是否应用 Siri 视觉（渐变光晕/玻璃主题）。非聊天舞台路由传 false。 */
+    applySiriVisual: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    AgentAppThemeContent(
+        appearance = appearance,
+        applyInterfaceScale = applyInterfaceScale,
+        onResolvedDarkModeChange = onResolvedDarkModeChange,
+        applySiriVisual = applySiriVisual,
+        content = content,
+    )
+}
+
+@Composable
+private fun AgentAppThemeContent(
+    appearance: AppearanceSettings,
+    applyInterfaceScale: Boolean,
+    onResolvedDarkModeChange: (Boolean) -> Unit,
+    applySiriVisual: Boolean,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -69,8 +88,11 @@ fun AgentAppTheme(
         )
     }
     val colors = controller.currentColors()
-    val themedColors = remember(colors, isDark, appearance.monetEnabled, appearance.pureBlackEnabled, appearance.visualStyle) {
-        if (appearance.visualStyle == AppearanceVisualStyle.SIRI) {
+    // Siri 视觉只在「聊天舞台」（主界面/对话页）生效：applySiriVisual=false 的路由
+    // 整体回落标准主题（原配色/原字阶），保证二级页与主界面互不渗透。
+    val isSiriVisual = applySiriVisual && appearance.visualStyle == AppearanceVisualStyle.SIRI
+    val themedColors = remember(colors, isDark, appearance.monetEnabled, appearance.pureBlackEnabled, isSiriVisual) {
+        if (isSiriVisual) {
             val base = if (isDark) siriDarkColors() else siriLightColors()
             if (appearance.pureBlackEnabled && isDark) {
                 base.copy(background = Color.Black, surface = Color.Black)
@@ -89,7 +111,7 @@ fun AgentAppTheme(
 
     LaunchedEffect(isDark) { onResolvedDarkModeChange(isDark) }
 
-    val textStyles = if (appearance.visualStyle == AppearanceVisualStyle.SIRI) {
+    val textStyles = if (isSiriVisual) {
         siriTextStyles()
     } else {
         MiuixTheme.textStyles
@@ -160,6 +182,7 @@ fun AgentAppTheme(
             LocalTopBarBlurStyle provides appearance.topBarBlurStyle,
             LocalPlatformDensity provides platformDensity,
             LocalDensity provides appDensity,
+            LocalSiriStage provides applySiriVisual,
         ) {
             // MaterialTheme 仅向 markdown-renderer-m3 提供与 Miuix 一致的颜色上下文。
             MaterialTheme(

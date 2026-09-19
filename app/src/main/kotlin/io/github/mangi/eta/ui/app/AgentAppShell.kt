@@ -33,7 +33,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
-import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.ui.components.AdaptiveTopAppBar
 import io.github.mangi.eta.ui.components.ConversationSidePaneScaffold
 import io.github.mangi.eta.ui.components.MiuixBackButton
@@ -104,7 +103,7 @@ fun AgentAppShell(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberTopBarBackdrop()
     // SIRI 风格：整屏弥散光晕由壳层承载，覆盖顶栏/空态/消息流/输入栏。
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     // SIRI 顶栏必须完全透出下层光晕，不能保留 surface 实底。
     val topBarColor = if (isSiriStyle) Color.Transparent else topBarContainerColor(backdrop)
@@ -199,7 +198,7 @@ private fun AgentTopBar(
     onOpenBrowser: () -> Unit,
 ) {
     val isHome = route is AppRoute.Home
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     val navigationIcon: @Composable () -> Unit = {
         if (isHome) {
@@ -300,7 +299,7 @@ private fun TopBarOverflowMenu(
     onOpenBrowser: () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     Box {
         IconButton(

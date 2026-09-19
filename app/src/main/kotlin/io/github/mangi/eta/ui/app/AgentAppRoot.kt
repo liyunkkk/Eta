@@ -104,6 +104,15 @@ fun AgentAppRoot(
     val context = LocalContext.current
     val uiScope = rememberCoroutineScope()
     val backStack = rememberNavBackStack<AppRoute>(AppRoute.Home)
+    // 路由级主题分流：只有主界面/对话页是「聊天舞台」，其余路由整体切回标准主题，
+    // 二级页（设置/供应商/记忆/终端等）恢复原生白底、卡片框线与顶栏毛玻璃。
+    val isSiriStageRoute = backStack.lastOrNull() is AppRoute.Home ||
+        backStack.lastOrNull() is AppRoute.Chat
+    AgentAppTheme(
+        appearance = LocalAppearanceSettings.current,
+        applyInterfaceScale = false,
+        applySiriVisual = isSiriStageRoute,
+    ) {
     val navigator = remember(backStack) { AgentNavigator(backStack) }
     var navigationResetKey by rememberSaveable { mutableIntStateOf(0) }
     val appViewModel = viewModel<AgentAppViewModel>()
@@ -863,7 +872,7 @@ fun AgentAppRoot(
         }
     }
 }
-
+}
 private data class MessageMutationTarget(
     val messageId: String,
     val laterTurnCount: Int,

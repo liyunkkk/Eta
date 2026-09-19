@@ -48,8 +48,7 @@ import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.model.AgentFileReference
 import io.github.mangi.eta.agent.model.AgentFileReferenceKind
-import io.github.mangi.eta.data.model.AppearanceVisualStyle
-import io.github.mangi.eta.ui.app.LocalAppearanceSettings
+import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.model.PendingFileReferenceUi
 import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.basic.DropdownImpl
@@ -84,7 +83,7 @@ internal fun AgentAttachmentPickerButton(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
     var showPopup by remember { mutableStateOf(false) }
     var showPathDialog by remember { mutableStateOf(false) }
