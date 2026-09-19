@@ -15,6 +15,10 @@ import io.github.mangi.eta.data.model.AppearanceAccentColor
 import io.github.mangi.eta.data.model.AppearancePaletteStyle
 import io.github.mangi.eta.data.model.AppearanceSettings
 import io.github.mangi.eta.data.model.AppearanceThemeMode
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.theme.siriDarkColors
+import io.github.mangi.eta.ui.theme.siriLightColors
+import io.github.mangi.eta.ui.theme.siriTextStyles
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec
@@ -65,8 +69,15 @@ fun AgentAppTheme(
         )
     }
     val colors = controller.currentColors()
-    val themedColors = remember(colors, isDark, appearance.monetEnabled, appearance.pureBlackEnabled) {
-        if (appearance.monetEnabled && appearance.pureBlackEnabled && isDark) {
+    val themedColors = remember(colors, isDark, appearance.monetEnabled, appearance.pureBlackEnabled, appearance.visualStyle) {
+        if (appearance.visualStyle == AppearanceVisualStyle.SIRI) {
+            val base = if (isDark) siriDarkColors() else siriLightColors()
+            if (appearance.pureBlackEnabled && isDark) {
+                base.copy(background = Color.Black, surface = Color.Black)
+            } else {
+                base
+            }
+        } else if (appearance.monetEnabled && appearance.pureBlackEnabled && isDark) {
             colors.copy(
                 background = Color.Black,
                 surface = Color.Black,
@@ -78,7 +89,13 @@ fun AgentAppTheme(
 
     LaunchedEffect(isDark) { onResolvedDarkModeChange(isDark) }
 
-    MiuixTheme(colors = themedColors) {
+    val textStyles = if (appearance.visualStyle == AppearanceVisualStyle.SIRI) {
+        siriTextStyles()
+    } else {
+        MiuixTheme.textStyles
+    }
+
+    MiuixTheme(colors = themedColors, textStyles = textStyles) {
         val platformDensity = LocalDensity.current
         val appDensity = remember(platformDensity, appearance.interfaceScale, applyInterfaceScale) {
             if (applyInterfaceScale) {
