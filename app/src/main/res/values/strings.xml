@@ -128,6 +128,9 @@
   <string name="appearance_theme_system">Follow system</string>
   <string name="appearance_theme_light">Light</string>
   <string name="appearance_theme_dark">Dark</string>
+  <string name="appearance_visual_style">Visual style</string>
+  <string name="appearance_visual_style_default">Default</string>
+  <string name="appearance_visual_style_siri">Siri</string>
   <string name="appearance_monet">Monet colors</string>
   <string name="appearance_monet_summary">Use system dynamic colors when available</string>
   <string name="appearance_palette_style">Color style</string>

@@ -25,6 +25,7 @@ import io.github.mangi.eta.R
 import io.github.mangi.eta.data.model.AppearanceAccentColor
 import io.github.mangi.eta.data.model.AppearancePaletteStyle
 import io.github.mangi.eta.data.model.AppearanceSettings
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.data.model.AppearanceThemeMode
 import io.github.mangi.eta.data.model.AppearanceTopBarBlurStyle
 import io.github.mangi.eta.data.model.MAX_INTERFACE_SCALE
@@ -78,6 +79,11 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
         stringResource(R.string.appearance_theme_light),
         stringResource(R.string.appearance_theme_dark),
     )
+    val visualStyles = AppearanceVisualStyle.entries
+    val visualStyleLabels = listOf(
+        stringResource(R.string.appearance_visual_style_default),
+        stringResource(R.string.appearance_visual_style_siri),
+    )
     val paletteStyles = AppearancePaletteStyle.entries
     val paletteLabels = listOf(
         stringResource(R.string.appearance_palette_tonal_spot),
@@ -129,6 +135,17 @@ internal fun AppearanceSettingsScreen(onBack: () -> Unit) {
                     onSelectedIndexChange = { index ->
                         themeModes.getOrNull(index)?.let { mode ->
                             update { current -> current.copy(themeMode = mode) }
+                        }
+                    },
+                )
+                OverlayDropdownPreference(
+                    title = stringResource(R.string.appearance_visual_style),
+                    summary = visualStyleLabels[appearance.visualStyle.ordinal],
+                    items = visualStyleLabels,
+                    selectedIndex = appearance.visualStyle.ordinal,
+                    onSelectedIndexChange = { index ->
+                        visualStyles.getOrNull(index)?.let { style ->
+                            update { current -> current.copy(visualStyle = style) }
                         }
                     },
                 )

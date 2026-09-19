@@ -127,6 +127,9 @@
   <string name="appearance_theme_system">跟随系统</string>
   <string name="appearance_theme_light">浅色</string>
   <string name="appearance_theme_dark">深色</string>
+  <string name="appearance_visual_style">视觉风格</string>
+  <string name="appearance_visual_style_default">默认</string>
+  <string name="appearance_visual_style_siri">Siri</string>
   <string name="appearance_monet">Monet 取色</string>
   <string name="appearance_monet_summary">可用时使用系统动态取色</string>
   <string name="appearance_palette_style">色彩风格</string>
