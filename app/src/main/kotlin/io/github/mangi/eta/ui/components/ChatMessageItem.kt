@@ -137,6 +137,7 @@ import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import io.github.mangi.eta.R
+import io.github.mangi.eta.ui.theme.SiriShapes
 import io.github.mangi.eta.agent.browser.AgentBrowserSession
 import io.github.mangi.eta.agent.browser.BrowserSessionSnapshot
 import io.github.mangi.eta.agent.model.AgentFileReferencePromptCodec
@@ -685,12 +686,12 @@ private fun ContextCompactionMarker(
     ) {
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(percent = 50))
+                .clip(SiriShapes.full)
                 .background(MiuixTheme.colorScheme.surface)
                 .border(
                     0.5.dp,
                     MiuixTheme.colorScheme.outline.copy(alpha = 0.5f),
-                    RoundedCornerShape(percent = 50),
+                    SiriShapes.full,
                 )
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -884,7 +885,7 @@ private fun AgentMessageBlock(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(percent = 50))
+                                .clip(SiriShapes.full)
                                 .background(MiuixTheme.colorScheme.surfaceContainerHigh)
                                 .padding(horizontal = 3.dp, vertical = 2.dp),
                         ) {
