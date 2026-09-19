@@ -12,9 +12,11 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,7 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,11 +75,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.mangi.eta.R
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.data.model.ReasoningEffort
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.AgentModelPickerUiState
 import io.github.mangi.eta.ui.model.PendingFileReferenceUi
 import io.github.mangi.eta.ui.model.PendingImageUi
+import io.github.mangi.eta.ui.theme.SiriShapes
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
@@ -133,6 +139,10 @@ internal fun AgentChatInputBar(
     modifier: Modifier = Modifier,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
+    // Siri 药丸底：浅灰半透（浅）/ 深灰半透（深），浮于弥散光晕之上。
+    val siriPillColor = if (siriDark) Color(0xCC1C1C1E) else Color(0xCCF5F5F5)
     val textFieldState = rememberTextFieldState(initialText = input)
     var wasEditingMessage by remember { mutableStateOf(isEditingMessage) }
     val canSend = textFieldState.text.isNotBlank() ||
@@ -224,22 +234,41 @@ internal fun AgentChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 84.dp)
-                    .dropShadow(
-                        shape = InputContainerShape,
-                        shadow = Shadow(
-                            radius = 8.dp,
-                            color = Color.Black,
-                            alpha = 0.08f,
-                        ),
-                    )
-                    .squircleSurface(
-                        color = MiuixTheme.colorScheme.surfaceContainer,
-                        cornerRadius = 20.dp,
-                    )
-                    .squircleBorder(
-                        width = 0.5.dp,
-                        color = MiuixTheme.colorScheme.outline.copy(alpha = 0.55f),
-                        cornerRadius = 20.dp,
+                    .then(
+                        if (isSiriStyle) {
+                            // Siri：全圆角大药丸 + 浅灰半透底 + 微边框 + 轻阴影。
+                            Modifier
+                                .dropShadow(
+                                    shape = SiriShapes.full,
+                                    shadow = Shadow(radius = 8.dp, color = Color.Black, alpha = 0.08f),
+                                )
+                                .clip(SiriShapes.full)
+                                .background(siriPillColor)
+                                .border(
+                                    width = 0.5.dp,
+                                    color = MiuixTheme.colorScheme.outline.copy(alpha = 0.45f),
+                                    shape = SiriShapes.full,
+                                )
+                        } else {
+                            Modifier
+                                .dropShadow(
+                                    shape = InputContainerShape,
+                                    shadow = Shadow(
+                                        radius = 8.dp,
+                                        color = Color.Black,
+                                        alpha = 0.08f,
+                                    ),
+                                )
+                                .squircleSurface(
+                                    color = MiuixTheme.colorScheme.surfaceContainer,
+                                    cornerRadius = 20.dp,
+                                )
+                                .squircleBorder(
+                                    width = 0.5.dp,
+                                    color = MiuixTheme.colorScheme.outline.copy(alpha = 0.55f),
+                                    cornerRadius = 20.dp,
+                                )
+                        },
                     )
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
@@ -361,11 +390,12 @@ internal fun AgentChatInputBar(
                             minHeight = ChatInputActionSize,
                         ) {
                             // 保留统一的点击区域，仅让可见圆形与相邻操作图标保持同一尺寸。
+                            val siriIdleTint = if (siriDark) Color(0xFF3A3A3C) else Color(0xFFD1D1D6)
                             val sendButtonColor by animateColorAsState(
                                 targetValue = when {
-                                    isStopMode -> MiuixTheme.colorScheme.onSurface
-                                    canSend -> MiuixTheme.colorScheme.primary
-                                    else -> MiuixTheme.colorScheme.surfaceContainerHigh
+                                    isStopMode -> if (isSiriStyle) Color.Black else MiuixTheme.colorScheme.onSurface
+                                    canSend -> if (isSiriStyle) Color.Black else MiuixTheme.colorScheme.primary
+                                    else -> if (isSiriStyle) siriIdleTint else MiuixTheme.colorScheme.surfaceContainerHigh
                                 },
                                 animationSpec = tween(durationMillis = 160),
                                 label = "send_button_color",
@@ -389,10 +419,10 @@ internal fun AgentChatInputBar(
                                     label = "send_stop_icon",
                                 ) { stopMode ->
                                     Icon(
-                                        imageVector = if (stopMode) {
-                                            Icons.Rounded.Stop
-                                        } else {
-                                            Icons.Rounded.ArrowUpward
+                                        imageVector = when {
+                                            stopMode -> Icons.Rounded.Stop
+                                            isSiriStyle && !canSend -> Icons.Rounded.Mic
+                                            else -> Icons.Rounded.ArrowUpward
                                         },
                                         contentDescription = when {
                                             stopMode -> stringResource(R.string.chat_stop)
@@ -404,9 +434,13 @@ internal fun AgentChatInputBar(
                                             if (stopMode) StopIconSize else SendIconSize
                                         ),
                                         tint = when {
-                                            stopMode -> MiuixTheme.colorScheme.surface
-                                            canSend -> MiuixTheme.colorScheme.onPrimary
-                                            else -> MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            stopMode -> if (isSiriStyle) Color.White else MiuixTheme.colorScheme.surface
+                                            canSend -> if (isSiriStyle) Color.White else MiuixTheme.colorScheme.onPrimary
+                                            else -> if (isSiriStyle) {
+                                                if (siriDark) Color(0xFF98989D) else Color(0xFF8A8A8E)
+                                            } else {
+                                                MiuixTheme.colorScheme.onSurfaceVariantActions
+                                            }
                                         },
                                     )
                                 }

@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -71,6 +72,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
@@ -93,6 +95,7 @@ import io.github.mangi.eta.ui.model.ToolSummaryMessageUi
 import io.github.mangi.eta.ui.model.UserMessageUi
 import io.github.mangi.eta.ui.model.latestContextUsage
 import io.github.mangi.eta.ui.theme.SiriGlass
+import io.github.mangi.eta.ui.theme.SiriShapes
 import io.github.mangi.eta.ui.theme.siriBackdrop
 import kotlin.math.exp
 import kotlin.math.min
@@ -1111,6 +1114,8 @@ private fun EmptyChatState(
     modifier: Modifier = Modifier,
 ) {
     val isCharacterConversation = characterName != null
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     val suggestions = listOf(
         SuggestionItem(
             title = stringResource(R.string.ui_analyze_current_screen_ebf08f),
@@ -1154,11 +1159,47 @@ private fun EmptyChatState(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
             } else {
-                Text(
-                    text = stringResource(R.string.ui_how_can_i_help_you_e75391),
-                    style = MiuixTheme.textStyles.headline1,
-                    color = MiuixTheme.colorScheme.onSurface,
-                )
+                if (isSiriStyle) {
+                    // Apple Intelligence Hero：大标题 + 副文案 + Try it 白胶囊。
+                    Text(
+                        text = stringResource(R.string.ui_how_can_i_help_you_e75391),
+                        style = MiuixTheme.textStyles.title2,
+                        color = MiuixTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(R.string.siri_hero_subtitle),
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(max = 320.dp),
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(SiriShapes.full)
+                            .background(if (siriDark) Color(0xB31C1C1E) else Color(0xB3FFFFFF))
+                            .border(
+                                width = 0.5.dp,
+                                color = MiuixTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                shape = SiriShapes.full,
+                            )
+                            .clickable { onSuggestionClick(suggestions.first().prompt) }
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.siri_hero_try_it),
+                            style = MiuixTheme.textStyles.body1,
+                            color = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = stringResource(R.string.ui_how_can_i_help_you_e75391),
+                        style = MiuixTheme.textStyles.headline1,
+                        color = MiuixTheme.colorScheme.onSurface,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(30.dp))
