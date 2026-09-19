@@ -66,6 +66,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 问题3：任务栏胶囊图标尺寸，与浮窗按钮图标（15dp）保持一致。 */
 private val TaskCapsuleIconSize = 15.dp
+/** 问题1：任务栏胶囊高度，与浮窗控制按钮/胶囊（32dp）统一。 */
+private val TaskCapsuleHeight = 32.dp
 
 /**
  * 统一任务状态胶囊徽章（本体与悬浮窗完全同源设计）
@@ -95,8 +97,12 @@ fun TaskStatusCapsuleBadge(
                 },
             )
             .clickable(onClick = onClick)
-            // 问题3：纵向内边距 6dp -> 7dp，使胶囊整体高度贴近浮窗按钮的 32dp 量级。
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            // 问题1：与浮窗按钮/胶囊统一为 32dp 高度。此前五套并存——
+            // 浮窗控制按钮 32dp、浮窗胶囊 34dp、屏幕上下文移除钮 30dp、
+            // 本胶囊约 31dp（图标 15dp + 上下各 8dp）。改用 heightIn 锁高而非
+            // padding 累加，图标与文字行高的变化不再引入偏差。
+            .heightIn(min = TaskCapsuleHeight)
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (state.runningCount > 0) {

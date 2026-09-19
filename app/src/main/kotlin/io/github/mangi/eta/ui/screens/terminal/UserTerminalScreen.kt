@@ -72,8 +72,8 @@ import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowListPopup
 
 /**
  * 用户手动终端：块式输出（命令、输出、退出码），给人用；与 AI 工具调用的任务模型分开。
@@ -333,7 +333,8 @@ private fun BlockMenu(
     onDismiss: () -> Unit,
     onReinput: (String) -> Unit,
 ) {
-    WindowListPopup(
+    // 问题2：改用 OverlayListPopup 以获得液态玻璃底（原 WindowListPopup 为独立 window 纯白）。
+    OverlayListPopup(
         show = show,
         alignment = PopupPositionProvider.Align.Start,
         onDismissRequest = onDismiss,

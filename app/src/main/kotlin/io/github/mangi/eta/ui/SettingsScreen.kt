@@ -79,7 +79,7 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
+import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
@@ -361,14 +361,14 @@ internal fun SettingsScreen(
                         onClick = openAssistantSettings,
                     )
                     if (prefs != null || hasConnectedFramework) {
-                        WindowSpinnerPreference(
+                        OverlaySpinnerPreference(
                             title = stringResource(R.string.ui_long_press_the_power_button_1958d0),
                             items = powerAssistantItems,
                             selectedIndex = powerAssistantTargets.indexOf(powerAssistantTarget),
                             onSelectedIndexChange = { index ->
                                 val target = powerAssistantTargets.getOrNull(index)
-                                    ?: return@WindowSpinnerPreference
-                                val targetPrefs = prefs ?: return@WindowSpinnerPreference
+                                    ?: return@OverlaySpinnerPreference
+                                val targetPrefs = prefs ?: return@OverlaySpinnerPreference
                                 if (putStringSync(
                                         prefs = targetPrefs,
                                         key = Prefs.Keys.POWER_KEY_ASSISTANT_TARGET,

@@ -21,7 +21,7 @@ import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
+import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -92,7 +92,7 @@ internal fun LinuxEnvironmentConfiguration(
     val distributions = LinuxDistribution.entries
     val backends = listOf(LinuxExecutionBackend.PROOT, LinuxExecutionBackend.CHROOT)
     Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-        WindowSpinnerPreference(
+        OverlaySpinnerPreference(
             title = stringResource(R.string.linux_distribution_title),
             items = distributions.map {
                 DropdownItem(
@@ -110,7 +110,7 @@ internal fun LinuxEnvironmentConfiguration(
             onSelectedIndexChange = { onDistributionSelected(distributions[it]) },
         )
         if (rootGranted || backend == LinuxExecutionBackend.CHROOT) {
-            WindowSpinnerPreference(
+            OverlaySpinnerPreference(
                 title = stringResource(R.string.capability_linux_backend),
                 items = backends.map {
                     DropdownItem(

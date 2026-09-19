@@ -926,15 +926,15 @@ private fun ScreenContextAttachment(
                 val available = screenContext.phase == EtaScreenContextPhase.AVAILABLE && enabled
                 Row(
                     modifier = Modifier
-                        .height(34.dp)
+                        .height(32.dp)
                         .squircleSurface(
                             color = colors.input.copy(alpha = 0.82f),
-                            cornerRadius = 17.dp,
+                            cornerRadius = 16.dp,
                         )
                         .squircleBorder(
                             width = 0.6.dp,
                             color = colors.inputBorder,
-                            cornerRadius = 17.dp,
+                            cornerRadius = 16.dp,
                         )
                         .clickable(enabled = available, onClick = onSelect)
                         .padding(horizontal = 12.dp),
@@ -1029,9 +1029,9 @@ private fun SelectedScreenContext(
         IconButton(
             onClick = onRemove,
             enabled = enabled,
-            minWidth = 30.dp,
-            minHeight = 30.dp,
-            cornerRadius = 15.dp,
+            minWidth = 32.dp,
+            minHeight = 32.dp,
+            cornerRadius = 16.dp,
         ) {
             Icon(
                 imageVector = Icons.Rounded.Close,
@@ -1092,15 +1092,15 @@ private fun ConversationCapsule(
 ) {
     Row(
         modifier = Modifier
-            .height(34.dp)
+            .height(32.dp)
             .squircleSurface(
                 color = colors.input.copy(alpha = 0.82f),
-                cornerRadius = 17.dp,
+                cornerRadius = 16.dp,
             )
             .squircleBorder(
                 width = 0.6.dp,
                 color = colors.inputBorder,
-                cornerRadius = 17.dp,
+                cornerRadius = 16.dp,
             )
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp),
@@ -1139,15 +1139,15 @@ private fun NewConversationCapsule(
 ) {
     Row(
         modifier = Modifier
-            .height(34.dp)
+            .height(32.dp)
             .squircleSurface(
                 color = colors.input.copy(alpha = 0.82f),
-                cornerRadius = 17.dp,
+                cornerRadius = 16.dp,
             )
             .squircleBorder(
                 width = 0.6.dp,
                 color = colors.inputBorder,
-                cornerRadius = 17.dp,
+                cornerRadius = 16.dp,
             )
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 10.dp),
@@ -1170,15 +1170,15 @@ private fun ScreenTranslationCapsule(
 ) {
     Row(
         modifier = Modifier
-            .height(34.dp)
+            .height(32.dp)
             .squircleSurface(
                 color = colors.input.copy(alpha = 0.82f),
-                cornerRadius = 17.dp,
+                cornerRadius = 16.dp,
             )
             .squircleBorder(
                 width = 0.6.dp,
                 color = colors.inputBorder,
-                cornerRadius = 17.dp,
+                cornerRadius = 16.dp,
             )
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp),

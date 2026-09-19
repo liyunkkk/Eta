@@ -516,7 +516,8 @@ private fun SupplementInput(
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val textColor = MiuixTheme.colorScheme.onSurface
-    // 问题3：浮窗输入框同步改为液态玻璃，并与主界面输入框统一 24dp 圆角。
+    // 问题3：浮窗输入框同步改为液态玻璃，并与主界面输入框统一圆角
+    // （SiriShapes.field = 43dp，取自小米 13 屏幕圆角 118px / density 2.75）。
     // 浮窗是独立 ComposeView（Service 内自建 MiuixTheme），此处直接注入玻璃修饰符。
     val overlayDark = isSystemInDarkTheme()
 
@@ -533,7 +534,9 @@ private fun SupplementInput(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 44.dp, max = 112.dp)
+                // 问题1：最小高度 44dp -> 56dp。43dp 圆角在 44dp 高容器上半径已超半高，
+                // 会被渲染成药丸；提高到 56dp 后才呈现「大圆角矩形」的正确观感。
+                .heightIn(min = 56.dp, max = 112.dp)
                 .siriGlassSurface(
                     shape = SiriShapes.field,
                     isDark = overlayDark,

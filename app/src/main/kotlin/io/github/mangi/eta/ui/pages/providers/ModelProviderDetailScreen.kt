@@ -72,7 +72,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
+import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -272,7 +272,7 @@ private fun ProviderConfigTab(
                 }
                 if (provider !is AnthropicProviderSetting) {
                     HorizontalDivider()
-                    WindowSpinnerPreference(
+                    OverlaySpinnerPreference(
                         items = listOf(
                             DropdownItem(text = "Chat Completions API"),
                             DropdownItem(text = "Responses API"),

@@ -4,12 +4,14 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddComment
@@ -55,8 +57,8 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowListPopup
 
 /**
  * Agent App 统一壳层。
@@ -240,6 +242,8 @@ private fun AgentTopBar(
                         contentDescription = stringResource(R.string.action_new_conversation),
                     )
                 }
+                // 问题4：与右侧溢出菜单按钮拉开间距，消除两按钮相切。
+                Spacer(modifier = Modifier.width(TopBarActionGap))
             }
             TopBarOverflowMenu(
                 onNewConversation = onNewConversation,
@@ -256,10 +260,10 @@ private fun AgentTopBar(
 
     if (isHome) {
         // 首页聊天舞台保持紧凑；二级内容页统一使用可折叠大标题。
-        // SIRI 风格：标题居中显示当前模型名 + 右箭头，左汉堡、右新建对话。
-        val siriTitle = if (isSiriStyle && homeModelName.isNotBlank()) "$homeModelName ›" else null
+        // 问题4：顶栏中间不再显示模型名，回落到对话标题；
+        // 空态下 homeTitle 为空，该区域即不显示任何文字，保持顶栏干净。
         SmallTopAppBar(
-            title = siriTitle ?: homeTitle.ifBlank { titleForRoute(route) },
+            title = homeTitle.ifBlank { titleForRoute(route) },
             color = color,
             scrollBehavior = scrollBehavior,
             navigationIcon = navigationIcon,
@@ -277,9 +281,11 @@ private fun AgentTopBar(
 }
 
 private val TopBarMenuIconSize = 20.dp
+/** 问题4：首页顶栏右侧按钮之间的间距，避免两个玻璃圆钮相切。 */
+private val TopBarActionGap = 8.dp
 
 /**
- * 首页顶栏溢出菜单。WindowListPopup 以父布局为锚点，因此与触发按钮包在同一个 Box 中，
+ * 首页顶栏溢出菜单。弹层以父布局为锚点，因此与触发按钮包在同一个 Box 中，
  * 弹层从按钮下方右对齐展开。
  */
 @Composable
@@ -315,7 +321,10 @@ private fun TopBarOverflowMenu(
                 contentDescription = stringResource(R.string.action_more),
             )
         }
-        WindowListPopup(
+        // 问题2：改用 OverlayListPopup——它与附件弹窗同源，在宿主 Scaffold 内渲染，
+        // 能采样到下层弥散光晕并吃到半透明 surfaceContainer；原 WindowListPopup 走
+        // 独立 Dialog window，弹窗底色实测为 (252,252,252) 纯白硬底，故玻璃化失效。
+        OverlayListPopup(
             show = showMenu,
             alignment = PopupPositionProvider.Align.End,
             onDismissRequest = { showMenu = false },

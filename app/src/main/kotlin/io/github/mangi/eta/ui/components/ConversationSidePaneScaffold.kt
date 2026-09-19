@@ -669,6 +669,12 @@ private fun ConversationTextRow(
             }
         }
 
+        // 问题2 例外（实测定案）：本弹窗所在面板 ConversationPanePanel 不在任何 Miuix
+        // Scaffold 的 CompositionLocalProvider 子树内——它是 AgentAppShell 里 Scaffold 的兄弟节点。
+        // 而 OverlayListPopup 依赖 Scaffold 注入的 LocalPopupStates，才能被 MiuixPopupHost 渲染
+        // （MiuixPopupUtils.kt:266 取 LocalRootPopupStates ?: LocalPopupStates；:546 host 只渲染
+        // LocalPopupStates）。改 Overlay 后 state 只会写进 staticCompositionLocalOf 的默认空列表，
+        // 无 host 消费，会话操作菜单将完全不显示。故此处保留窗口级 WindowListPopup。
         WindowListPopup(
             show = showActionMenu,
             popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,

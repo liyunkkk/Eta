@@ -13,14 +13,18 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.layout.WidePageContent
 import io.github.mangi.eta.ui.layout.horizontalCutoutPadding
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
@@ -40,9 +44,16 @@ fun MiuixScaffoldPage(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberTopBarBackdrop()
     val topBarColor = topBarContainerColor(backdrop)
+    // 问题3：SIRI 风格下二级页背景必须透明，让壳层弥散光晕透出。
+    // Miuix Scaffold 默认 containerColor = colorScheme.surface = #FFFFFF 不透明硬底，
+    // 会把顶栏下方整块盖成纯白，与顶栏透出的光晕形成割裂（实测 y>=400 全为 255,255,255）。
+    // 一处改动即覆盖全部使用本骨架的二级页，DEFAULT 模式行为不变。
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val containerColor = if (isSiriStyle) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = containerColor,
         topBar = {
             TopBarBackdrop(backdrop) {
                 AdaptiveTopAppBar(
@@ -100,9 +111,13 @@ fun MiuixScaffold(
     val scrollBehavior = MiuixScrollBehavior()
     val backdrop = rememberTopBarBackdrop()
     val topBarColor = topBarContainerColor(backdrop)
+    // 问题3：与 MiuixScaffoldPage 同一处理，SIRI 下透明以透出壳层弥散光晕。
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val containerColor = if (isSiriStyle) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = containerColor,
         topBar = {
             TopBarBackdrop(backdrop) {
                 AdaptiveTopAppBar(
