@@ -112,23 +112,32 @@ fun Modifier.siriBackdrop(isDark: Boolean): Modifier = this.drawBehind {
 
     val w = size.width
     val h = size.height
-    val mint = if (isDark) Color(0xFF14201B) else Color(0xFFD2F5E3)
-    val sky = if (isDark) Color(0xFF141B22) else Color(0xFFD9ECFF)
+    val mint = if (isDark) Color(0xFF1B2C24) else Color(0xFFB7E9CC)
+    val sky = if (isDark) Color(0xFF18222C) else Color(0xFFCFE6FF)
+    val warm = if (isDark) Color(0xFF0B0C0E) else Color(0xFFFDF8F4)
 
-    // 顶部薄荷绿光晕：覆盖顶部横带，向下柔和淡出。
+    // 顶部薄荷绿光晕：中心接近不透明，向下、向两侧大范围柔和淡出。
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(mint.copy(alpha = 0.95f), mint.copy(alpha = 0.45f), Color.Transparent),
-            center = Offset(x = w * 0.30f, y = h * 0.02f),
-            radius = h * 0.75f,
+            colors = listOf(mint, mint.copy(alpha = 0.72f), Color.Transparent),
+            center = Offset(x = w * 0.34f, y = h * 0.04f),
+            radius = h * 0.62f,
         ),
     )
-    // 中部偏右天蓝光晕：与薄荷绿交叠，向右下弥散。
+    // 中上部偏右天蓝光晕：与薄荷绿交叠，向右下弥散。
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(sky.copy(alpha = 0.9f), sky.copy(alpha = 0.4f), Color.Transparent),
-            center = Offset(x = w * 0.78f, y = h * 0.30f),
-            radius = h * 0.7f,
+            colors = listOf(sky, sky.copy(alpha = 0.6f), Color.Transparent),
+            center = Offset(x = w * 0.72f, y = h * 0.34f),
+            radius = h * 0.58f,
+        ),
+    )
+    // 底部暖白回填：让下半屏自然过渡到暖白/米白。
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color.Transparent, warm.copy(alpha = 0.85f)),
+            startY = h * 0.52f,
+            endY = h * 0.92f,
         ),
     )
 }
