@@ -15,6 +15,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,8 +75,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.browser.AgentBrowserSession
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.ui.app.AgentConversationRevisionReducer
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.app.LocalBlurEnabled
 import io.github.mangi.eta.ui.model.AgentChatMessageUi
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
@@ -89,6 +92,8 @@ import io.github.mangi.eta.ui.model.ToolActivityMessageUi
 import io.github.mangi.eta.ui.model.ToolSummaryMessageUi
 import io.github.mangi.eta.ui.model.UserMessageUi
 import io.github.mangi.eta.ui.model.latestContextUsage
+import io.github.mangi.eta.ui.theme.SiriBackdrop
+import io.github.mangi.eta.ui.theme.SiriGlass
 import kotlin.math.exp
 import kotlin.math.min
 import kotlinx.coroutines.CancellationException
@@ -323,6 +328,10 @@ private fun AgentChatScaffold(
     modifier: Modifier = Modifier,
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
+    val backdropBrush = if (isSiriStyle) SiriBackdrop.brush(siriDark) else null
+    val siriGlassSurface = if (siriDark) SiriGlass.tintDark else SiriGlass.tintLight
     val frostEnabled = hasMessages && LocalBlurEnabled.current && isRuntimeShaderSupported()
     val messageBackdrop = rememberLayerBackdrop {
         // Backdrop 必须包含不透明底色，否则文字边缘模糊到透明区域时会出现黑边。
@@ -627,7 +636,11 @@ internal fun AgentConversationMessages(
 
     // 滚动层保持整屏，输入器作为后绘制浮层；输入器高度进入列表的
     // afterContentPadding，确保跟到底部时最后一行停在输入器上方。
-    Box(modifier = modifier.clipToBounds()) {
+    Box(
+        modifier = modifier
+            .clipToBounds()
+            .then(if (backdropBrush != null) Modifier.background(backdropBrush) else Modifier),
+    ) {
         val safeTimelineEntries = remember(timelineEntries) { timelineEntries.distinctBy { it.key } }
         LazyColumn(
             state = scrollState,
@@ -965,19 +978,24 @@ private fun AgentChatBottomBar(
                     .fillMaxWidth()
                     .height(16.dp)
                     .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                MiuixTheme.colorScheme.surface,
-                            ),
-                        )
+                        if (isSiriStyle) {
+                            // Siri 渐变底下不再叠加 surface 渐隐，保持舞台通透。
+                            Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Transparent))
+                        } else {
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MiuixTheme.colorScheme.surface,
+                                ),
+                            )
+                        },
                     ),
             )
         }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MiuixTheme.colorScheme.surface)
+                .background(if (isSiriStyle) Color.Transparent else MiuixTheme.colorScheme.surface)
                 .navigationBarsPadding()
                 .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
         ) {
@@ -1194,7 +1212,7 @@ private fun SuggestionCard(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(MiuixTheme.colorScheme.surface)
+            .background(if (isSiriStyle) siriGlassSurface else MiuixTheme.colorScheme.surface)
             .border(
                 width = 0.5.dp,
                 color = MiuixTheme.colorScheme.outline.copy(alpha = 0.5f),
