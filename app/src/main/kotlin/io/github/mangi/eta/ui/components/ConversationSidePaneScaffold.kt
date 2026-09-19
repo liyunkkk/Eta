@@ -83,7 +83,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import io.github.mangi.eta.ui.theme.LocalAppearanceSettings
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle

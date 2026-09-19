@@ -60,7 +60,7 @@ import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import io.github.mangi.eta.data.model.AppearanceVisualStyle
-import io.github.mangi.eta.ui.theme.LocalAppearanceSettings
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
