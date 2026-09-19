@@ -328,10 +328,6 @@ private fun AgentChatScaffold(
     modifier: Modifier = Modifier,
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
-    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
-    val siriDark = isSystemInDarkTheme()
-    val backdropBrush = if (isSiriStyle) SiriBackdrop.brush(siriDark) else null
-    val siriGlassSurface = if (siriDark) SiriGlass.tintDark else SiriGlass.tintLight
     val frostEnabled = hasMessages && LocalBlurEnabled.current && isRuntimeShaderSupported()
     val messageBackdrop = rememberLayerBackdrop {
         // Backdrop 必须包含不透明底色，否则文字边缘模糊到透明区域时会出现黑边。
@@ -443,6 +439,8 @@ internal fun AgentConversationMessages(
     currentBrowserMessageId: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val backdropBrush = if (isSiriStyle) SiriBackdrop.brush(isSystemInDarkTheme()) else null
     val timelineEntries = remember(visibleMessages) { visibleMessages.toTimelineEntries() }
     // 复制按钮只出现在每轮对话的最终结果上，中间步骤的过渡文本不提供复制入口。
     // 流式进行中当前这一轮尚未收尾，此时的“最后一条正文”只是中间步骤，不标记。
@@ -936,6 +934,7 @@ private fun AgentChatBottomBar(
     onRetryTask: (String) -> Unit = {},
     onEditTask: (String) -> Unit = {},
 ) {
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1209,6 +1208,8 @@ private fun SuggestionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriGlassSurface = if (isSystemInDarkTheme()) SiriGlass.tintDark else SiriGlass.tintLight
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
