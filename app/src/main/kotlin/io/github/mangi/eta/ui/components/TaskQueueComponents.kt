@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -58,7 +59,13 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.theme.LocalAppearanceSettings
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/** 问题3：任务栏胶囊图标尺寸，与浮窗按钮图标（15dp）保持一致。 */
+private val TaskCapsuleIconSize = 15.dp
 
 /**
  * 统一任务状态胶囊徽章（本体与悬浮窗完全同源设计）
@@ -70,17 +77,32 @@ fun TaskStatusCapsuleBadge(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
-            .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+            .then(
+                if (isSiriStyle) {
+                    // 问题3：任务栏胶囊与浮窗按钮同源——液态玻璃面 + 渐变描边。
+                    Modifier.siriGlassSurface(
+                        shape = RoundedCornerShape(percent = 50),
+                        isDark = siriDark,
+                        refractionAlpha = 0.8f,
+                    )
+                } else {
+                    Modifier.background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                },
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            // 问题3：纵向内边距 6dp -> 7dp，使胶囊整体高度贴近浮窗按钮的 32dp 量级。
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (state.runningCount > 0) {
             InfiniteProgressIndicator(
-                modifier = Modifier.size(14.dp),
+                // 问题3：与浮窗按钮图标（15dp）量级对齐。
+                modifier = Modifier.size(TaskCapsuleIconSize),
                 color = MiuixTheme.colorScheme.primary,
             )
         } else {
@@ -126,7 +148,8 @@ fun TaskStatusCapsuleBadge(
         Icon(
             imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
             contentDescription = null,
-            modifier = Modifier.size(16.dp),
+            // 问题3：与浮窗按钮图标量级对齐。
+            modifier = Modifier.size(TaskCapsuleIconSize),
             tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
         )
     }

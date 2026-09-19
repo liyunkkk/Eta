@@ -234,13 +234,14 @@ internal fun AgentChatInputBar(
                     .heightIn(min = 84.dp)
                     .then(
                         if (isSiriStyle) {
-                            // Siri：全圆角大药丸 + 液态玻璃（折射渐变 + 1px 渐变描边 + 上沿高光）。
+                            // 问题3：圆角与小米 13 屏幕圆角（约 24dp）统一，不再是全圆角药丸；
+                            // 液态玻璃质感（折射渐变 + 1px 渐变描边 + 上沿高光）保持不变。
                             Modifier
                                 .dropShadow(
-                                    shape = SiriShapes.full,
+                                    shape = SiriShapes.field,
                                     shadow = Shadow(radius = 10.dp, color = Color.Black, alpha = 0.10f),
                                 )
-                                .siriGlassSurface(shape = SiriShapes.full, isDark = siriDark)
+                                .siriGlassSurface(shape = SiriShapes.field, isDark = siriDark)
                         } else {
                             Modifier
                                 .dropShadow(

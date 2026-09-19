@@ -40,6 +40,16 @@ object SiriShapes {
 
     /** 输入胶囊、圆形按钮等全圆角。 */
     val full: RoundedCornerShape = RoundedCornerShape(percent = 50)
+    /**
+     * 输入框 / 浮窗输入容器圆角。
+     *
+     * 基准来自实机取证（非估算）：小米 13 (fuxi) 屏幕圆角
+     *   dumpsys display -> roundedCorners radius=118px，density=2.75
+     *   118 / 2.75 = 42.9dp -> 取 43dp
+     * 取代此前的全圆角药丸（percent = 50），使输入区圆角与系统屏幕圆角完全对齐：
+     * 单行时观感接近胶囊，多行拉高后自然过渡为大圆角矩形，不再是恒定半圆。
+     */
+    val field: RoundedCornerShape = RoundedCornerShape(43.dp)
 }
 
 /** 玻璃质感叠色与描边。 */
@@ -66,9 +76,9 @@ object SiriGlass {
  */
 object SiriBackdrop {
     // 浅色态：底部暖白，顶部薄荷绿 + 天蓝弥散光晕。
-    private val lightBase = Color(0xFFF8F9FA)      // 底部暖灰/米白
+    private val lightBase = Color(0xFFFBFDF9)      // 底部暖白（微偏绿，与光晕同调）
     private val lightMint = Color(0xFFD2F5E3)      // 顶部淡薄荷绿
-    private val lightSky = Color(0xFFE3F2FD)       // 中部淡天蓝
+    private val lightSky = Color(0xFFE6F2F5)       // 中部淡青（降饱和，纠正整体偏蓝）
 
     // 深色态：近黑底，顶部暗青 + 暗蓝弥散光晕（按浅色同结构降明度推导）。
     private val darkBase = Color(0xFF0B0C0E)       // 底部近黑
@@ -126,24 +136,26 @@ fun DrawScope.drawSiriBackdrop(isDark: Boolean) {
 
     val w = size.width
     val h = size.height
-    val mint = if (isDark) Color(0xFF1B2C24) else Color(0xFFB7E9CC)
-    val sky = if (isDark) Color(0xFF18222C) else Color(0xFFCFE6FF)
-    val warm = if (isDark) Color(0xFF0B0C0E) else Color(0xFFFDF8F4)
+    // 问题5：主调必须是「绿」。薄荷绿为绝对主导（大半径 + 高不透明度），
+    // 青蓝仅作右上角点缀（小半径 + 低不透明度），彻底纠正此前天蓝占比过大导致的偏蓝观感。
+    val mint = if (isDark) Color(0xFF16302A) else Color(0xFFA6E8C8)
+    val sky = if (isDark) Color(0xFF16222A) else Color(0xFFD9ECF2)
+    val warm = if (isDark) Color(0xFF0B0C0E) else Color(0xFFFBFDF9)
 
     // 顶部薄荷绿光晕：中心接近不透明，向下、向两侧大范围柔和淡出。
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(mint, mint.copy(alpha = 0.72f), Color.Transparent),
-            center = Offset(x = w * 0.34f, y = h * 0.04f),
-            radius = h * 0.62f,
+            colors = listOf(mint, mint.copy(alpha = 0.86f), Color.Transparent),
+            center = Offset(x = w * 0.42f, y = h * 0.02f),
+            radius = h * 0.78f,
         ),
     )
     // 中上部偏右天蓝光晕：与薄荷绿交叠，向右下弥散。
     drawRect(
         brush = Brush.radialGradient(
-            colors = listOf(sky, sky.copy(alpha = 0.6f), Color.Transparent),
-            center = Offset(x = w * 0.72f, y = h * 0.34f),
-            radius = h * 0.58f,
+            colors = listOf(sky, sky.copy(alpha = 0.40f), Color.Transparent),
+            center = Offset(x = w * 0.82f, y = h * 0.42f),
+            radius = h * 0.44f,
         ),
     )
     // 底部暖白回填：让下半屏自然过渡到暖白/米白。

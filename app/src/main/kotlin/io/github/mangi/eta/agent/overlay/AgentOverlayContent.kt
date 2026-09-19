@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -52,6 +53,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import io.github.mangi.eta.ui.theme.SiriShapes
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -480,12 +483,19 @@ private fun OverlayControlButton(
     contentDescription: String,
     tint: Color,
 ) {
+    val overlayDark = isSystemInDarkTheme()
     IconButton(
         onClick = onClick,
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainerHigh,
+        backgroundColor = Color.Transparent,
         minWidth = 32.dp,
         minHeight = 32.dp,
         cornerRadius = 16.dp,
+        // 问题3：浮窗控制按钮改用液态玻璃面（与主界面按钮同源质感）。
+        modifier = Modifier.siriGlassSurface(
+            shape = RoundedCornerShape(16.dp),
+            isDark = overlayDark,
+            refractionAlpha = 0.8f,
+        ),
     ) {
         Icon(
             imageVector = icon,
@@ -506,7 +516,9 @@ private fun SupplementInput(
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val textColor = MiuixTheme.colorScheme.onSurface
-    val fieldBg = MiuixTheme.colorScheme.surfaceContainer
+    // 问题3：浮窗输入框同步改为液态玻璃，并与主界面输入框统一 24dp 圆角。
+    // 浮窗是独立 ComposeView（Service 内自建 MiuixTheme），此处直接注入玻璃修饰符。
+    val overlayDark = isSystemInDarkTheme()
 
     LaunchedEffect(Unit) {
         delay(180)
@@ -522,8 +534,11 @@ private fun SupplementInput(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 44.dp, max = 112.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(fieldBg)
+                .siriGlassSurface(
+                    shape = SiriShapes.field,
+                    isDark = overlayDark,
+                    refractionAlpha = 0.85f,
+                )
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             contentAlignment = Alignment.TopStart,
         ) {

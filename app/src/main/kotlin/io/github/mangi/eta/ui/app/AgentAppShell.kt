@@ -294,8 +294,22 @@ private fun TopBarOverflowMenu(
     onOpenBrowser: () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     Box {
-        IconButton(onClick = { onRefreshKimiWeb(); showMenu = true }) {
+        IconButton(
+            onClick = { onRefreshKimiWeb(); showMenu = true },
+            modifier = if (isSiriStyle) {
+                // 问题3：顶栏溢出菜单按钮补齐液态玻璃，与汉堡 / SquarePen 一致。
+                Modifier.siriGlassSurface(
+                    shape = CircleShape,
+                    isDark = siriDark,
+                    refractionAlpha = 0.55f,
+                )
+            } else {
+                Modifier
+            },
+        ) {
             Icon(
                 imageVector = Icons.Rounded.MoreVert,
                 contentDescription = stringResource(R.string.action_more),

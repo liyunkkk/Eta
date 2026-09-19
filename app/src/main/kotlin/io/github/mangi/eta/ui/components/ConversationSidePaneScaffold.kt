@@ -83,6 +83,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.mangi.eta.ui.theme.LocalAppearanceSettings
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -364,29 +366,29 @@ private fun ConversationPanePanel(
     val query = state.searchQuery.trim()
     val groups = remember(state.conversations) { state.conversations.groupForDrawer() }
     val density = LocalDensity.current
+    // 问题4：对话列表为独立功能面板，不要边界背景，整块统一纯白实底。
+    val isSiriPane = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
 
     Surface(
         modifier = modifier
             .width(width)
             .fillMaxHeight(),
-        color = MiuixTheme.colorScheme.surface,
+        color = if (isSiriPane) Color.White else MiuixTheme.colorScheme.surface,
         contentColor = MiuixTheme.colorScheme.onSurface,
     ) {
-        // 列表全高滚动，搜索区与 Dock 作为浮层盖在内容上；两个浮层用与顶栏相同的
-        // textureBlur 采样列表 backdrop，内容滚入边缘时呈现毛玻璃而不是硬裁切。
-        // 有内容滚到浮层下方时浮层边缘出现分隔线，静止在顶部/底部时保持无边界。
-        val backdrop = rememberTopBarBackdrop()
+        // 问题4：列表全高滚动，搜索区与 Dock 作为浮层盖在内容上。
+        // 顶部/底部浮层已取消毛玻璃采样（否则会在列表顶部/底部形成一圈「边界背景」），
+        // 因此不再需要 backdrop 捕获——同时省去一份无谓的 layer 捕获开销。
         var headerHeightPx by remember { mutableIntStateOf(0) }
         var dockHeightPx by remember { mutableIntStateOf(0) }
         val listState = rememberLazyListState()
-        val showHeaderDivider by remember { derivedStateOf { listState.canScrollBackward } }
-        val showDockDivider by remember { derivedStateOf { listState.canScrollForward } }
+        // 问题4：顶部/底部浮层已取消毛玻璃与分隔线（整块纯白统一），
+        // 原先基于滚动位置的分隔线状态不再需要，已一并移除。
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .captureForTopBar(backdrop)
                     .windowInsetsPadding(
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
                     )
@@ -426,8 +428,9 @@ private fun ConversationPanePanel(
                 }
             }
             PaneFrostRegion(
-                backdrop = backdrop,
-                showDivider = showHeaderDivider,
+                // 问题4：顶部不再使用毛玻璃浮层 + 分隔线，消除「边界背景」割裂感。
+                backdrop = null,
+                showDivider = false,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
@@ -449,8 +452,9 @@ private fun ConversationPanePanel(
                 }
             }
             PaneFrostRegion(
-                backdrop = backdrop,
-                showDivider = showDockDivider,
+                // 问题4：底部 Dock 同步取消毛玻璃与分隔线，整块面板背景纯白统一。
+                backdrop = null,
+                showDivider = false,
                 dividerAtTop = true,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

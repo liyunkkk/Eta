@@ -44,7 +44,10 @@ fun siriLightColors(): Colors = lightColorScheme().copy(
     onPrimaryContainer = SiriLightTextPrimary,
     secondaryContainer = SiriLightCard,
     onSecondaryContainer = SiriLightTextPrimary,
-    background = SiriLightBg,
+    // 问题1：OverlayDialog 的默认 backgroundColor 取 MiuixTheme.colorScheme.background
+    // （DialogContentLayout.kt:445）。此处一并半透明化，让输入路径/供应商等弹窗
+    // 与 OverlayListPopup 保持同一玻璃观感。项目内无其它 background 消费点。
+    background = SiriLightBg.copy(alpha = 0.88f),
     onBackground = SiriLightTextPrimary,
     surface = SiriLightCard,
     onSurface = SiriLightTextPrimary,
@@ -53,10 +56,13 @@ fun siriLightColors(): Colors = lightColorScheme().copy(
     onSurfaceVariantSummary = SiriLightTextSecondary,
     onSurfaceVariantActions = SiriLightTextSecondary.copy(alpha = 0.62f),
     disabledOnSurface = SiriLightTextSecondary.copy(alpha = 0.45f),
-    surfaceContainer = SiriLightCard,
+    // 问题1：Miuix 全部二级弹窗/浮层（OverlayListPopup / WindowListPopup）的容器背景
+    // 在框架内部硬取 surfaceContainer（ListPopup.kt:605），因此在这里统一改为半透明
+    // 白玻璃，让弹窗一次覆盖到位，与主界面液态玻璃观感一致，而非此前的纯白硬底。
+    surfaceContainer = SiriLightCard.copy(alpha = 0.86f),
     onSurfaceContainer = SiriLightTextPrimary,
     onSurfaceContainerVariant = SiriLightTextSecondary,
-    surfaceContainerHigh = SiriLightCard,
+    surfaceContainerHigh = SiriLightCard.copy(alpha = 0.93f),
     onSurfaceContainerHigh = SiriLightTextSecondary,
     outline = Color(0xFFD9D9DE),
     windowDimming = Color.Black.copy(alpha = 0.30f),
@@ -70,7 +76,7 @@ fun siriDarkColors(): Colors = darkColorScheme().copy(
     onPrimaryContainer = SiriDarkTextPrimary,
     secondaryContainer = SiriDarkSurface,
     onSecondaryContainer = SiriDarkTextPrimary,
-    background = SiriDarkBg,
+    background = SiriDarkBg.copy(alpha = 0.88f),
     onBackground = SiriDarkTextPrimary,
     surface = SiriDarkSurface,
     onSurface = SiriDarkTextPrimary,
@@ -79,10 +85,10 @@ fun siriDarkColors(): Colors = darkColorScheme().copy(
     onSurfaceVariantSummary = SiriDarkTextSecondary,
     onSurfaceVariantActions = SiriDarkTextSecondary.copy(alpha = 0.62f),
     disabledOnSurface = SiriDarkTextSecondary.copy(alpha = 0.45f),
-    surfaceContainer = SiriDarkSurface,
+    surfaceContainer = SiriDarkSurface.copy(alpha = 0.86f),
     onSurfaceContainer = SiriDarkTextPrimary,
     onSurfaceContainerVariant = SiriDarkTextSecondary,
-    surfaceContainerHigh = SiriDarkSurfaceHigh,
+    surfaceContainerHigh = SiriDarkSurfaceHigh.copy(alpha = 0.93f),
     onSurfaceContainerHigh = SiriDarkTextSecondary,
     outline = Color(0xFF3A3A3C),
     windowDimming = Color.Black.copy(alpha = 0.60f),

@@ -947,9 +947,18 @@ private fun AgentChatBottomBar(
             .imePadding(),
     ) {
         if (messageBackdrop != null) {
+            // 问题2：SIRI 模式下光晕是整屏连续的，若这里再叠加 72% 不透明白（surface）
+            // 就会在输入栏上方压出一条白色横带，与下方 Transparent 的输入区形成硬分界线。
+            // 因此 SIRI 时改用完全透明的 blend，只保留「模糊」而不叠色，让光晕连续贯通。
             val blurColors = BlurDefaults.blurColors(
                 blendColors = listOf(
-                    BlendColorEntry(MiuixTheme.colorScheme.surface.copy(alpha = 0.72f))
+                    BlendColorEntry(
+                        if (isSiriStyle) {
+                            Color.Transparent
+                        } else {
+                            MiuixTheme.colorScheme.surface.copy(alpha = 0.72f)
+                        },
+                    )
                 ),
             )
             Box(
