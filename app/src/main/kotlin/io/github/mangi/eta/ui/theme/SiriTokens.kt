@@ -1,12 +1,16 @@
 package io.github.mangi.eta.ui.theme
 
 import androidx.compose.animation.core.Easing
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -107,6 +111,16 @@ object SiriBackdrop {
  * 仅 SIRI 模式由聊天舞台根容器调用；DEFAULT 不加。
  */
 fun Modifier.siriBackdrop(isDark: Boolean): Modifier = this.drawBehind {
+    drawSiriBackdrop(isDark)
+}
+
+/**
+ * 弥散光晕的绘制体（DrawScope 版本）。
+ *
+ * 抽成独立函数是为了让顶栏毛玻璃的 backdrop 底也能复用同一份光晕，
+ * 否则 `rememberLayerBackdrop` 内的白底会把顶栏采样结果冲成不透明白色。
+ */
+fun DrawScope.drawSiriBackdrop(isDark: Boolean) {
     val base = SiriBackdrop.fallbackColor(isDark)
     drawRect(base)
 
@@ -141,6 +155,110 @@ fun Modifier.siriBackdrop(isDark: Boolean): Modifier = this.drawBehind {
         ),
     )
 }
+
+/**
+ * 液态玻璃（Liquid Glass）质感层。
+ *
+ * 与普通毛玻璃的区别：玻璃面不是均一半透明，而是
+ * ① 沿对角线做「上亮下暗」的折射渐变（模拟凸透镜厚度差）；
+ * ② 左上内高光 + 右下内暗边（模拟边缘全反射）；
+ * ③ 1px 渐变描边（顶部近白、底部近透明），形成「玻璃边缘」的锐利切线；
+ * ④ 内层大圆角高光弧，强化「液态」的圆润饱满感。
+ *
+ * 全部为静态绘制（drawWithContent / drawBehind），不含任何无限动画，
+ * 满足「禁止常驻 rememberInfiniteTransition」的功耗红线。
+ */
+object SiriLiquidGlass {
+    /** 玻璃折射渐变（浅色）：左上更亮、右下更透——必须保留足够透明度让光晕透出。 */
+    fun refractLight(): Brush = Brush.linearGradient(
+        colors = listOf(
+            Color(0x8CFFFFFF),
+            Color(0x4DFFFFFF),
+            Color(0x73FFFFFF),
+        ),
+    )
+
+    /** 玻璃折射渐变（深色）：左上更亮、右下更暗。 */
+    fun refractDark(): Brush = Brush.linearGradient(
+        colors = listOf(
+            Color(0x3DFFFFFF),
+            Color(0x1AFFFFFF),
+            Color(0x26FFFFFF),
+        ),
+    )
+
+    fun refract(isDark: Boolean): Brush = if (isDark) refractDark() else refractLight()
+
+    /** 边缘描边渐变（浅色）：顶部近白高光 → 底部极淡灰。 */
+    fun edgeLight(): Brush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0x99FFFFFF),
+            Color(0x33FFFFFF),
+            Color(0x1A000000),
+        ),
+    )
+
+    /** 边缘描边渐变（深色）：顶部微白高光 → 底部近黑。 */
+    fun edgeDark(): Brush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0x4DFFFFFF),
+            Color(0x1AFFFFFF),
+            Color(0x33000000),
+        ),
+    )
+
+    fun edge(isDark: Boolean): Brush = if (isDark) edgeDark() else edgeLight()
+}
+
+/**
+ * 液态玻璃修饰符：折射渐变底 + 1px 渐变描边 + 内高光。
+ *
+ * 调用顺序敏感——需先 [clip] 再挂本修饰符，保证描边与高光都被裁剪在形状内。
+ * 使用示例：`Modifier.dropShadow(...).clip(shape).siriLiquidGlass(shape, isDark)`
+ */
+fun Modifier.siriLiquidGlass(
+    shape: Shape,
+    isDark: Boolean,
+    /** 玻璃折射面的整体不透明度，按容器层级微调。 */
+    refractionAlpha: Float = 1f,
+): Modifier = this
+    .drawBehind {
+        // 玻璃主体：对角折射渐变。
+        drawRect(
+            brush = SiriLiquidGlass.refract(isDark),
+            alpha = refractionAlpha,
+        )
+        // 顶部内高光：一条自左向右淡出的窄带，模拟玻璃上沿的镜面反射。
+        val highlightHeight = size.height * 0.42f
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = if (isDark) 0.14f else 0.55f),
+                    Color.Transparent,
+                ),
+                startY = 0f,
+                endY = highlightHeight,
+            ),
+        )
+    }
+    .border(
+        width = 1.dp,
+        brush = SiriLiquidGlass.edge(isDark),
+        shape = shape,
+    )
+
+/**
+ * 液态玻璃容器便捷修饰符：裁剪 + 玻璃面 + 渐变描边。
+ *
+ * 用于输入栏药丸、圆形按钮、建议 chip 等所有需要液态玻璃的容器。
+ */
+fun Modifier.siriGlassSurface(
+    shape: Shape,
+    isDark: Boolean,
+    refractionAlpha: Float = 1f,
+): Modifier = this
+    .clip(shape)
+    .siriLiquidGlass(shape = shape, isDark = isDark, refractionAlpha = refractionAlpha)
 
 /** 文字与图标色。 */
 object SiriContent {

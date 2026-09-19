@@ -6,6 +6,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,7 +48,10 @@ import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.model.AgentFileReference
 import io.github.mangi.eta.agent.model.AgentFileReferenceKind
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.model.PendingFileReferenceUi
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -77,6 +81,8 @@ internal fun AgentAttachmentPickerButton(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     var showPopup by remember { mutableStateOf(false) }
     var showPathDialog by remember { mutableStateOf(false) }
     var pathInput by remember { mutableStateOf("") }
@@ -135,6 +141,16 @@ internal fun AgentAttachmentPickerButton(
             onClick = { showPopup = true },
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
+            modifier = if (isSiriStyle) {
+                // Apple Intelligence 输入栏左端：圆形液态玻璃「+」。
+                Modifier.siriGlassSurface(
+                    shape = CircleShape,
+                    isDark = siriDark,
+                    refractionAlpha = 0.8f,
+                )
+            } else {
+                Modifier
+            },
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,

@@ -1,6 +1,7 @@
 package io.github.mangi.eta.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,6 +12,7 @@ import io.github.mangi.eta.data.model.AppearanceVisualStyle
 import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.app.LocalBlurEnabled
 import io.github.mangi.eta.ui.app.LocalTopBarBlurStyle
+import io.github.mangi.eta.ui.theme.drawSiriBackdrop
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
@@ -25,9 +27,16 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 internal fun rememberTopBarBackdrop(): LayerBackdrop? {
     if (!LocalBlurEnabled.current || !isRuntimeShaderSupported()) return null
-    val surfaceColor = MiuixTheme.colorScheme.surface
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val isDark = isSystemInDarkTheme()
     return rememberLayerBackdrop {
-        drawRect(surfaceColor)
+        if (isSiriStyle) {
+            // SIRI：backdrop 底必须是弥散光晕，否则顶栏毛玻璃采样到不透明白底，
+            // 表现为「顶部不透明」——这正是之前顶栏发白的根因。
+            drawSiriBackdrop(isDark)
+        } else {
+            drawRect(MiuixTheme.colorScheme.surface)
+        }
         drawContent()
     }
 }

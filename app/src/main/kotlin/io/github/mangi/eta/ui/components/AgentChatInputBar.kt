@@ -12,7 +12,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
@@ -83,6 +82,7 @@ import io.github.mangi.eta.ui.model.AgentModelPickerUiState
 import io.github.mangi.eta.ui.model.PendingFileReferenceUi
 import io.github.mangi.eta.ui.model.PendingImageUi
 import io.github.mangi.eta.ui.theme.SiriShapes
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
@@ -141,8 +141,6 @@ internal fun AgentChatInputBar(
     val keyboard = LocalSoftwareKeyboardController.current
     val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
     val siriDark = isSystemInDarkTheme()
-    // Siri 药丸底：浅灰半透（浅）/ 深灰半透（深），浮于弥散光晕之上。
-    val siriPillColor = if (siriDark) Color(0xCC1C1C1E) else Color(0xCCF5F5F5)
     val textFieldState = rememberTextFieldState(initialText = input)
     var wasEditingMessage by remember { mutableStateOf(isEditingMessage) }
     val canSend = textFieldState.text.isNotBlank() ||
@@ -236,19 +234,13 @@ internal fun AgentChatInputBar(
                     .heightIn(min = 84.dp)
                     .then(
                         if (isSiriStyle) {
-                            // Siri：全圆角大药丸 + 浅灰半透底 + 微边框 + 轻阴影。
+                            // Siri：全圆角大药丸 + 液态玻璃（折射渐变 + 1px 渐变描边 + 上沿高光）。
                             Modifier
                                 .dropShadow(
                                     shape = SiriShapes.full,
-                                    shadow = Shadow(radius = 8.dp, color = Color.Black, alpha = 0.08f),
+                                    shadow = Shadow(radius = 10.dp, color = Color.Black, alpha = 0.10f),
                                 )
-                                .clip(SiriShapes.full)
-                                .background(siriPillColor)
-                                .border(
-                                    width = 0.5.dp,
-                                    color = MiuixTheme.colorScheme.outline.copy(alpha = 0.45f),
-                                    shape = SiriShapes.full,
-                                )
+                                .siriGlassSurface(shape = SiriShapes.full, isDark = siriDark)
                         } else {
                             Modifier
                                 .dropShadow(
@@ -403,8 +395,20 @@ internal fun AgentChatInputBar(
                             Box(
                                 modifier = Modifier
                                     .size(SendButtonVisualSize)
-                                    .clip(CircleShape)
-                                    .background(sendButtonColor),
+                                    .then(
+                                        if (isSiriStyle && !canSend && !isStopMode) {
+                                            // SIRI 待机态：液态玻璃圆钮（Mic），而非实心灰。
+                                            Modifier.siriGlassSurface(
+                                                shape = CircleShape,
+                                                isDark = siriDark,
+                                                refractionAlpha = 0.85f,
+                                            )
+                                        } else {
+                                            Modifier
+                                                .clip(CircleShape)
+                                                .background(sendButtonColor)
+                                        },
+                                    ),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 AnimatedContent(
@@ -466,6 +470,8 @@ private fun ThinkingEffortChip(
 ) {
     var showPopup by remember { mutableStateOf(false) }
     val active = effort != ReasoningEffort.OFF
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     val menuEnabled = enabled && options.size > 1
     LaunchedEffect(menuEnabled) {
         if (!menuEnabled) showPopup = false
@@ -488,6 +494,15 @@ private fun ThinkingEffortChip(
             enabled = menuEnabled,
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
+            modifier = if (isSiriStyle) {
+                Modifier.siriGlassSurface(
+                    shape = CircleShape,
+                    isDark = siriDark,
+                    refractionAlpha = 0.7f,
+                )
+            } else {
+                Modifier
+            },
         ) {
             Icon(
                 imageVector = ImageVector.vectorResource(R.drawable.ic_atom),

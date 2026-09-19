@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -38,10 +39,11 @@ import io.github.mangi.eta.ui.components.TopBarBackdrop
 import io.github.mangi.eta.ui.components.captureForTopBar
 import io.github.mangi.eta.ui.components.rememberTopBarBackdrop
 import io.github.mangi.eta.ui.components.topBarContainerColor
-import io.github.mangi.eta.ui.theme.siriBackdrop
 import io.github.mangi.eta.ui.model.ConversationPaneUiState
 import io.github.mangi.eta.ui.model.ConversationSummaryUi
 import io.github.mangi.eta.ui.navigation.AppRoute
+import io.github.mangi.eta.ui.theme.siriBackdrop
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
@@ -106,7 +108,9 @@ fun AgentAppShell(
     val topBarColor = if (isSiriStyle) Color.Transparent else topBarContainerColor(backdrop)
     val pageContent: @Composable () -> Unit = {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (isSiriStyle) Modifier.siriBackdrop(siriDark) else Modifier),
             containerColor = if (isSiriStyle) Color.Transparent else MiuixTheme.colorScheme.surface,
             contentWindowInsets = WindowInsets.safeDrawing.only(
                 WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
@@ -146,11 +150,7 @@ fun AgentAppShell(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(if (isSiriStyle) Modifier.siriBackdrop(siriDark) else Modifier),
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         if (conversationPaneState != null && currentRoute is AppRoute.Home) {
             ConversationSidePaneScaffold(
                 state = conversationPaneState,
@@ -198,9 +198,22 @@ private fun AgentTopBar(
 ) {
     val isHome = route is AppRoute.Home
     val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     val navigationIcon: @Composable () -> Unit = {
         if (isHome) {
-            IconButton(onClick = onOpenConversationPane) {
+            IconButton(
+                onClick = onOpenConversationPane,
+                modifier = if (isSiriStyle) {
+                    // SIRI：液态玻璃圆底，浮于顶栏毛玻璃之上。
+                    Modifier.siriGlassSurface(
+                        shape = CircleShape,
+                        isDark = siriDark,
+                        refractionAlpha = 0.55f,
+                    )
+                } else {
+                    Modifier
+                },
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Menu,
                     contentDescription = stringResource(R.string.action_conversation_history),
@@ -214,7 +227,14 @@ private fun AgentTopBar(
         if (isHome) {
             if (isSiriStyle) {
                 // Apple Intelligence 顶栏右侧：微灰圆底新建对话（SquarePen）。
-                IconButton(onClick = onNewConversation) {
+                IconButton(
+                    onClick = onNewConversation,
+                    modifier = Modifier.siriGlassSurface(
+                        shape = CircleShape,
+                        isDark = siriDark,
+                        refractionAlpha = 0.55f,
+                    ),
+                ) {
                     Icon(
                         imageVector = Icons.Rounded.Create,
                         contentDescription = stringResource(R.string.action_new_conversation),

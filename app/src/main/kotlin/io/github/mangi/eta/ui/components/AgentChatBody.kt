@@ -97,8 +97,9 @@ import io.github.mangi.eta.ui.model.ToolActivityMessageUi
 import io.github.mangi.eta.ui.model.ToolSummaryMessageUi
 import io.github.mangi.eta.ui.model.UserMessageUi
 import io.github.mangi.eta.ui.model.latestContextUsage
-import io.github.mangi.eta.ui.theme.SiriGlass
 import io.github.mangi.eta.ui.theme.SiriShapes
+import io.github.mangi.eta.ui.theme.drawSiriBackdrop
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import kotlin.math.exp
 import kotlin.math.min
 import kotlinx.coroutines.CancellationException
@@ -333,10 +334,13 @@ private fun AgentChatScaffold(
     modifier: Modifier = Modifier,
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     val frostEnabled = hasMessages && LocalBlurEnabled.current && isRuntimeShaderSupported()
     val messageBackdrop = rememberLayerBackdrop {
         // Backdrop 必须包含不透明底色，否则文字边缘模糊到透明区域时会出现黑边。
-        drawRect(surfaceColor)
+        // SIRI 模式下底色用弥散光晕，否则输入栏毛玻璃会采样到不透明白底。
+        if (isSiriStyle) drawSiriBackdrop(siriDark) else drawRect(surfaceColor)
         drawContent()
     }
 
@@ -1170,15 +1174,15 @@ private fun EmptyChatState(
                 )
                 if (!isCharacterConversation) {
                     Spacer(modifier = Modifier.height(18.dp))
-                    // Try it 白胶囊。
+                    // Try it 白胶囊（液态玻璃）。
                     Box(
                         modifier = Modifier
-                            .clip(SiriShapes.full)
-                            .background(if (siriDark) Color(0xB31C1C1E) else Color(0xB3FFFFFF))
-                            .border(
-                                width = 0.5.dp,
-                                color = MiuixTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                shape = SiriShapes.full,
+                            .then(
+                                Modifier.siriGlassSurface(
+                                    shape = SiriShapes.full,
+                                    isDark = siriDark,
+                                    refractionAlpha = 0.8f,
+                                ),
                             )
                             .clickable { onSuggestionClick(suggestions.first().prompt) }
                             .padding(horizontal = 20.dp, vertical = 8.dp),
@@ -1299,15 +1303,27 @@ private fun SuggestionCard(
     modifier: Modifier = Modifier,
 ) {
     val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
-    val siriGlassSurface = if (isSystemInDarkTheme()) SiriGlass.tintDark else SiriGlass.tintLight
+    val siriDark = isSystemInDarkTheme()
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSiriStyle) siriGlassSurface else MiuixTheme.colorScheme.surface)
-            .border(
-                width = 0.5.dp,
-                color = MiuixTheme.colorScheme.outline.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp),
+            .then(
+                if (isSiriStyle) {
+                    // Apple Intelligence 建议 chip：液态玻璃面 + 渐变描边。
+                    Modifier.siriGlassSurface(
+                        shape = RoundedCornerShape(20.dp),
+                        isDark = siriDark,
+                        refractionAlpha = 0.7f,
+                    )
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MiuixTheme.colorScheme.surface)
+                        .border(
+                            width = 0.5.dp,
+                            color = MiuixTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                        )
+                },
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 13.dp, vertical = 12.dp),

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,11 +44,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.AgentModelOptionUi
 import io.github.mangi.eta.ui.model.AgentModelPickerUiState
 import io.github.mangi.eta.ui.model.defaultExpandedModelProviderIds
 import io.github.mangi.eta.ui.model.formatContextUsage
+import io.github.mangi.eta.ui.theme.siriGlassSurface
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -81,6 +85,8 @@ internal fun AgentModelPickerButton(
     var showPopup by remember { mutableStateOf(false) }
     var expandedProviderIds by remember { mutableStateOf(emptySet<String>()) }
     val selected = state.selectedModel
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     val enabled = !isStreaming && !state.isChanging
     LaunchedEffect(enabled) {
         if (!enabled) showPopup = false
@@ -104,8 +110,20 @@ internal fun AgentModelPickerButton(
             enabled = enabled,
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
-            modifier = Modifier.semantics {
-                contentDescription = switchModelDescription
+            modifier = if (isSiriStyle) {
+                Modifier
+                    .siriGlassSurface(
+                        shape = CircleShape,
+                        isDark = siriDark,
+                        refractionAlpha = 0.7f,
+                    )
+                    .semantics {
+                        contentDescription = switchModelDescription
+                    }
+            } else {
+                Modifier.semantics {
+                    contentDescription = switchModelDescription
+                }
             },
         ) {
             ModelBrandMark(
@@ -319,6 +337,8 @@ internal fun AgentContextUsageButton(
 ) {
     val scope = rememberCoroutineScope()
     val tooltipState = rememberTooltipState(isPersistent = true)
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
     val progress = usage.progress
     val progressColor = when {
         progress == null -> MiuixTheme.colorScheme.onSurfaceVariantActions
@@ -389,6 +409,15 @@ internal fun AgentContextUsageButton(
             onClick = { scope.launch { tooltipState.show() } },
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
+            modifier = if (isSiriStyle) {
+                Modifier.siriGlassSurface(
+                    shape = CircleShape,
+                    isDark = siriDark,
+                    refractionAlpha = 0.7f,
+                )
+            } else {
+                Modifier
+            },
         ) {
             CircularProgressIndicator(
                 progress = progress ?: 0f,
