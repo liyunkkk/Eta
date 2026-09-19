@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -11,15 +12,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +48,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
@@ -85,7 +91,6 @@ internal fun AgentModelPickerButton(
     var expandedProviderIds by remember { mutableStateOf(emptySet<String>()) }
     val selected = state.selectedModel
     val isSiriStyle = LocalSiriStage.current
-    val siriDark = isSystemInDarkTheme()
     val enabled = !isStreaming && !state.isChanging
     LaunchedEffect(enabled) {
         if (!enabled) showPopup = false
@@ -109,27 +114,56 @@ internal fun AgentModelPickerButton(
             enabled = enabled,
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
-            modifier = if (isSiriStyle) {
-                Modifier
-                    .siriGlassSurface(
-                        shape = CircleShape,
-                        isDark = siriDark,
-                        refractionAlpha = 0.7f,
-                    )
-                    .semantics {
-                        contentDescription = switchModelDescription
-                    }
-            } else {
-                Modifier.semantics {
-                    contentDescription = switchModelDescription
-                }
+            modifier = Modifier.semantics {
+                contentDescription = switchModelDescription
             },
         ) {
-            ModelBrandMark(
-                modelId = selected?.modelId,
-                sourceType = selected?.providerSourceType,
-                size = ChatInputActionIconSize,
-            )
+            if (isSiriStyle) {
+                // 设计稿一比一：Siri 舞台模型选择器为文字胶囊（品牌 logo + 模型名 + chevron）。
+                // 点击开合仍由 IconButton 承担；弹窗内容与定位零改动。
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = 168.dp)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MiuixTheme.colorScheme.surface)
+                        .border(
+                            width = 0.5.dp,
+                            color = MiuixTheme.colorScheme.outline.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(16.dp),
+                        )
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ModelBrandMark(
+                        modelId = selected?.modelId,
+                        sourceType = selected?.providerSourceType,
+                        size = 20.dp,
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = selected?.displayName ?: stringResource(R.string.model_not_selected),
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                    )
+                }
+            } else {
+                ModelBrandMark(
+                    modelId = selected?.modelId,
+                    sourceType = selected?.providerSourceType,
+                    size = ChatInputActionIconSize,
+                )
+            }
         }
 
         OverlayListPopup(

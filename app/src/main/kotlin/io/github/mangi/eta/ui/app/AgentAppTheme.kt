@@ -33,6 +33,8 @@ fun AgentAppTheme(
     onResolvedDarkModeChange: (Boolean) -> Unit = {},
     /** 本主题是否应用 Siri 视觉（渐变光晕/玻璃主题）。非聊天舞台路由传 false。 */
     applySiriVisual: Boolean = true,
+    /** 是否绘制 Siri 渐变光晕背景。仅主界面为 true；对话页保持纯白背景。 */
+    applySiriBackdrop: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     AgentAppThemeContent(
@@ -40,6 +42,7 @@ fun AgentAppTheme(
         applyInterfaceScale = applyInterfaceScale,
         onResolvedDarkModeChange = onResolvedDarkModeChange,
         applySiriVisual = applySiriVisual,
+        applySiriBackdrop = applySiriBackdrop,
         content = content,
     )
 }
@@ -50,6 +53,7 @@ private fun AgentAppThemeContent(
     applyInterfaceScale: Boolean,
     onResolvedDarkModeChange: (Boolean) -> Unit,
     applySiriVisual: Boolean,
+    applySiriBackdrop: Boolean,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -183,6 +187,7 @@ private fun AgentAppThemeContent(
             LocalPlatformDensity provides platformDensity,
             LocalDensity provides appDensity,
             LocalSiriStage provides applySiriVisual,
+            LocalSiriBackdrop provides applySiriBackdrop,
         ) {
             // MaterialTheme 仅向 markdown-renderer-m3 提供与 Miuix 一致的颜色上下文。
             MaterialTheme(

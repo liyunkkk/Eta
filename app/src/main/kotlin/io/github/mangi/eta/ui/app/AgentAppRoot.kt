@@ -109,10 +109,13 @@ fun AgentAppRoot(
     // 二级页（设置/供应商/记忆/终端等）恢复原生白底、卡片框线与顶栏毛玻璃。
     val isSiriStageRoute = backStack.lastOrNull() is AppRoute.Home ||
         backStack.lastOrNull() is AppRoute.Chat
+    // 渐变光晕背景仅随主界面出现；对话页保持纯白背景（玻璃样式仍生效）。
+    val isHomeRoute = backStack.lastOrNull() is AppRoute.Home
     AgentAppTheme(
         appearance = LocalAppearanceSettings.current,
         applyInterfaceScale = false,
         applySiriVisual = isSiriStageRoute,
+        applySiriBackdrop = isHomeRoute,
     ) {
     val navigator = remember(backStack) { AgentNavigator(backStack) }
     var navigationResetKey by rememberSaveable { mutableIntStateOf(0) }

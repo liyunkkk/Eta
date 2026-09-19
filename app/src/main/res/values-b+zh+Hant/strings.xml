@@ -1105,7 +1105,8 @@
   <string name="chat_edit_replace_later">傳送後將取代此訊息及其後的內容</string>
   <string name="chat_edit_replace_message">傳送後將取代此訊息</string>
   <string name="chat_eta_working">Eta 正在執行…</string>
-  <string name="chat_input_hint">交給 Eta 完成</string>
+  <string name="chat_input_hint">傳送訊息給 Agent...</string>
+  <string name="input_thinking_label">深度思考</string>
   <string name="chat_stop">停止</string>
   <string name="chat_send">傳送</string>
   <string name="chat_reasoning_effort">思考強度，目前為 %1$s</string>

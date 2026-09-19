@@ -12,6 +12,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,7 +44,9 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,6 +102,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 
 private val SendButtonVisualSize = ChatInputActionSize
+/** Siri 舞台发送钮视觉直径：设计稿一比一（36dp 绿色圆钮）。 */
+private val SendButtonSiriSize = 36.dp
+/** Siri 舞台发送钮绿色：设计稿像素采样值 #11A46D。 */
+private val SendSiriGreen = Color(0xFF11A46D)
+/** Siri 舞台发送钮图标字形尺寸（随 36dp 圆钮等比放大）。 */
+private val SendIconSiriSize = 20.dp
 private val SendIconSize = 16.dp
 private val StopIconSize = 10.dp
 private val ThinkingIconSize = 21.dp
@@ -294,7 +304,7 @@ internal fun AgentChatInputBar(
                     if (textFieldState.text.isBlank()) {
                         Text(
                             text = if (isStreaming) stringResource(R.string.chat_eta_working) else stringResource(R.string.chat_input_hint),
-                            style = MiuixTheme.textStyles.body1,
+                            style = MiuixTheme.textStyles.body2,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         )
                     }
@@ -398,7 +408,7 @@ internal fun AgentChatInputBar(
                             val sendButtonColor by animateColorAsState(
                                 targetValue = when {
                                     isStopMode -> if (isSiriStyle) Color.Black else MiuixTheme.colorScheme.onSurface
-                                    canSend -> if (isSiriStyle) Color.Black else MiuixTheme.colorScheme.primary
+                                    canSend -> if (isSiriStyle) SendSiriGreen else MiuixTheme.colorScheme.primary
                                     else -> if (isSiriStyle) siriIdleTint else MiuixTheme.colorScheme.surfaceContainerHigh
                                 },
                                 animationSpec = tween(durationMillis = 160),
@@ -406,7 +416,7 @@ internal fun AgentChatInputBar(
                             )
                             Box(
                                 modifier = Modifier
-                                    .size(SendButtonVisualSize)
+                                    .size(if (isSiriStyle) SendButtonSiriSize else SendButtonVisualSize)
                                     .then(
                                         if (isSiriStyle && !canSend && !isStopMode) {
                                             // SIRI 待机态：液态玻璃圆钮（Mic），而非实心灰。
@@ -438,6 +448,8 @@ internal fun AgentChatInputBar(
                                         imageVector = when {
                                             stopMode -> Icons.Rounded.Stop
                                             isSiriStyle && !canSend -> Icons.Rounded.Mic
+                                            // 设计稿一比一：Siri 舞台发送键为白色纸飞机（Send）。
+                                            isSiriStyle -> Icons.Rounded.Send
                                             else -> Icons.Rounded.ArrowUpward
                                         },
                                         contentDescription = when {
@@ -447,7 +459,11 @@ internal fun AgentChatInputBar(
                                             else -> stringResource(R.string.chat_send)
                                         },
                                         modifier = Modifier.size(
-                                            if (stopMode) StopIconSize else SendIconSize
+                                            when {
+                                                stopMode -> StopIconSize
+                                                isSiriStyle -> SendIconSiriSize
+                                                else -> SendIconSize
+                                            }
                                         ),
                                         tint = when {
                                             stopMode -> if (isSiriStyle) Color.White else MiuixTheme.colorScheme.surface
@@ -500,7 +516,6 @@ private fun ThinkingEffortChip(
     var showPopup by remember { mutableStateOf(false) }
     val active = effort != ReasoningEffort.OFF
     val isSiriStyle = LocalSiriStage.current
-    val siriDark = isSystemInDarkTheme()
     val menuEnabled = enabled && options.size > 1
     LaunchedEffect(menuEnabled) {
         if (!menuEnabled) showPopup = false
@@ -523,22 +538,54 @@ private fun ThinkingEffortChip(
             enabled = menuEnabled,
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
-            modifier = if (isSiriStyle) {
-                Modifier.siriGlassSurface(
-                    shape = CircleShape,
-                    isDark = siriDark,
-                    refractionAlpha = 0.7f,
-                )
-            } else {
-                Modifier
-            },
+            modifier = Modifier,
         ) {
-            Icon(
-                imageVector = ImageVector.vectorResource(R.drawable.ic_atom),
-                contentDescription = stringResource(R.string.chat_reasoning_effort, effort.displayName),
-                modifier = Modifier.size(ThinkingIconSize),
-                tint = contentColor,
-            )
+            if (isSiriStyle) {
+                // 设计稿一比一：Siri 舞台思考档位为文字胶囊（原子图标 + 固定文案 + chevron）。
+                // 点击开合仍由 IconButton 承担；档位弹窗内容与定位零改动。
+                Row(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MiuixTheme.colorScheme.surface)
+                        .border(
+                            width = 0.5.dp,
+                            color = MiuixTheme.colorScheme.outline.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(16.dp),
+                        )
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.ic_atom),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = contentColor,
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = stringResource(R.string.input_thinking_label),
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = ImageVector.vectorResource(R.drawable.ic_atom),
+                    contentDescription = stringResource(R.string.chat_reasoning_effort, effort.displayName),
+                    modifier = Modifier.size(ThinkingIconSize),
+                    tint = contentColor,
+                )
+            }
         }
         OverlayListPopup(
             show = showPopup && menuEnabled && popupAnchorTopPx > 0,

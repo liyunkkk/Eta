@@ -1131,7 +1131,8 @@
   <string name="chat_edit_replace_later">Sending will replace this message and everything after it</string>
   <string name="chat_edit_replace_message">Sending will replace this message</string>
   <string name="chat_eta_working">Eta is working…</string>
-  <string name="chat_input_hint">Ask Eta to do something</string>
+  <string name="chat_input_hint">Message your Agent...</string>
+  <string name="input_thinking_label">Deep thinking</string>
   <string name="chat_stop">Stop</string>
   <string name="chat_send">Send</string>
   <string name="chat_reasoning_effort">Reasoning effort: %1$s</string>

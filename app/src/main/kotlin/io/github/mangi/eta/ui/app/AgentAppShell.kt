@@ -107,14 +107,18 @@ internal fun AgentAppShell(
     // SIRI 风格：整屏弥散光晕由壳层承载，覆盖顶栏/空态/消息流/输入栏。
     val isSiriStyle = LocalSiriStage.current
     val siriDark = isSystemInDarkTheme()
+    // 渐变光晕仅随主界面出现；对话页退为纯白背景（玻璃样式仍生效）。
+    val siriBackdropVisible = LocalSiriBackdrop.current
     // SIRI 顶栏必须完全透出下层光晕，不能保留 surface 实底。
     val topBarColor = if (isSiriStyle) Color.Transparent else topBarContainerColor(backdrop)
     val pageContent: @Composable () -> Unit = {
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isSiriStyle) Modifier.siriBackdrop(siriDark) else Modifier),
-            containerColor = if (isSiriStyle) Color.Transparent else MiuixTheme.colorScheme.surface,
+                .then(
+                    if (isSiriStyle && siriBackdropVisible) Modifier.siriBackdrop(siriDark) else Modifier,
+                ),
+            containerColor = if (isSiriStyle && siriBackdropVisible) Color.Transparent else MiuixTheme.colorScheme.surface,
             contentWindowInsets = WindowInsets.safeDrawing.only(
                 WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
             ),

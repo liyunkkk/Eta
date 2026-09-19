@@ -83,6 +83,7 @@ import io.github.mangi.eta.agent.browser.AgentBrowserSession
 import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.ui.navigation.AppRoute
 import io.github.mangi.eta.ui.app.AgentConversationRevisionReducer
+import io.github.mangi.eta.ui.app.LocalSiriBackdrop
 import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.app.LocalBlurEnabled
 import io.github.mangi.eta.ui.model.AgentChatMessageUi
@@ -338,12 +339,13 @@ private fun AgentChatScaffold(
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
     val isSiriStyle = LocalSiriStage.current
+    val siriBackdropVisible = LocalSiriBackdrop.current
     val siriDark = isSystemInDarkTheme()
     val frostEnabled = hasMessages && LocalBlurEnabled.current && isRuntimeShaderSupported()
     val messageBackdrop = rememberLayerBackdrop {
         // Backdrop 必须包含不透明底色，否则文字边缘模糊到透明区域时会出现黑边。
-        // SIRI 模式下底色用弥散光晕，否则输入栏毛玻璃会采样到不透明白底。
-        if (isSiriStyle) drawSiriBackdrop(siriDark) else drawRect(surfaceColor)
+        // 渐变光晕仅随主界面绘制（LocalSiriBackdrop）；对话页底色为纯白，毛玻璃不再采样渐变。
+        if (siriBackdropVisible) drawSiriBackdrop(siriDark) else drawRect(surfaceColor)
         drawContent()
     }
 
