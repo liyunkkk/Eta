@@ -36,7 +36,7 @@ import io.github.mangi.eta.ui.components.PreferenceIcon
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Card
+import io.github.mangi.eta.ui.components.EtaCard as Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 

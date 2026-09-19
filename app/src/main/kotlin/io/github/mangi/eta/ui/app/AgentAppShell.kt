@@ -40,6 +40,7 @@ import io.github.mangi.eta.ui.components.TopBarBackdrop
 import io.github.mangi.eta.ui.components.captureForTopBar
 import io.github.mangi.eta.ui.components.rememberTopBarBackdrop
 import io.github.mangi.eta.ui.components.topBarContainerColor
+import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.ConversationPaneUiState
 import io.github.mangi.eta.ui.model.ConversationSummaryUi
 import io.github.mangi.eta.ui.navigation.AppRoute
@@ -68,13 +69,14 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * - Settings 由标准二级页骨架自己提供 TopAppBar，壳层在此路由不重复绘制。
  */
 @Composable
-fun AgentAppShell(
+internal fun AgentAppShell(
     currentRoute: AppRoute?,
     isCurrentRoute: Boolean,
     conversationPaneState: ConversationPaneUiState?,
     isConversationPaneOpen: Boolean,
     homeTitle: String = "",
     homeModelName: String = "",
+    contextUsage: AgentContextUsageUi? = null,
     onBack: () -> Unit,
     onOpenConversationPane: () -> Unit,
     onDismissConversationPane: () -> Unit,
@@ -155,6 +157,8 @@ fun AgentAppShell(
         if (conversationPaneState != null && currentRoute is AppRoute.Home) {
             ConversationSidePaneScaffold(
                 state = conversationPaneState,
+                modelName = homeModelName,
+                contextUsage = contextUsage,
                 visible = isConversationPaneOpen,
                 backHandlerEnabled = isCurrentRoute,
                 onOpen = onOpenConversationPane,

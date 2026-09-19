@@ -49,6 +49,7 @@ import io.github.mangi.eta.ui.AppearanceSettingsScreen
 import io.github.mangi.eta.ui.SettingsScreen
 import io.github.mangi.eta.ui.components.MiuixDialogActions
 import io.github.mangi.eta.ui.model.AgentChatAction
+import io.github.mangi.eta.ui.model.latestContextUsage
 import io.github.mangi.eta.ui.model.AgentHomeAction
 import io.github.mangi.eta.ui.model.AgentMemoryAction
 import io.github.mangi.eta.ui.model.AgentSkillsAction
@@ -230,6 +231,16 @@ fun AgentAppRoot(
             isConversationPaneOpen = conversationPaneOpen,
             homeTitle = agentState.currentConversationTitle(),
             homeModelName = agentState.modelPickerState.selectedModel?.displayName.orEmpty(),
+            // 侧边栏上下文 HUD：复用与输入栏同一个工厂，避免出现第二套口径。
+            contextUsage = remember(
+                agentState.homeState.messages,
+                agentState.modelPickerState.selectedModel,
+            ) {
+                latestContextUsage(
+                    messages = agentState.homeState.messages,
+                    selectedModel = agentState.modelPickerState.selectedModel,
+                )
+            },
             onBack = { popRoute() },
             onOpenConversationPane = { conversationPaneOpen = true },
             onDismissConversationPane = { conversationPaneOpen = false },
@@ -374,6 +385,7 @@ fun AgentAppRoot(
                             }
                         },
                         isDrawerOpen = conversationPaneOpen,
+                        onOpenRoute = { route -> pushRoute(route) },
                     )
                 }
             }
@@ -429,6 +441,7 @@ fun AgentAppRoot(
                                 }
                             }
                         },
+                        onOpenRoute = { route -> pushRoute(route) },
                     )
                 }
             }

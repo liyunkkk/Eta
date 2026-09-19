@@ -1188,4 +1188,18 @@
   <string name="functional_model_set_as_translation">設為螢幕翻譯模型</string>
   <string name="functional_model_current_chat">當前主對話模型</string>
   <string name="functional_model_current_translation">當前螢幕翻譯模型</string>
+  <string name="drawer_section_recent">最近對話</string>
+  <string name="drawer_section_workspace">工作區與能力</string>
+  <string name="drawer_section_system">系統與設定</string>
+  <string name="drawer_workspace_label">工作區</string>
+  <string name="drawer_value_unset">未設定</string>
+  <string name="input_tool_panel_title">工具箱</string>
+  <string name="input_tool_panel_subtitle_image">從相簿選擇</string>
+  <string name="input_tool_panel_subtitle_file">任意檔案</string>
+  <string name="input_tool_panel_subtitle_folder">整個資料夾</string>
+  <string name="input_tool_panel_subtitle_path">手動輸入路徑</string>
+  <string name="input_tool_panel_subtitle_tools">內建工具</string>
+  <string name="input_tool_panel_subtitle_skills">已安裝技能</string>
+  <string name="input_tool_panel_subtitle_terminal">Linux 終端機</string>
+  <string name="input_tool_panel_subtitle_mcp">外部伺服器</string>
 </resources>

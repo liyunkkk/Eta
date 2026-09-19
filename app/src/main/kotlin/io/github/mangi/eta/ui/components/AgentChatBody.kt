@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.browser.AgentBrowserSession
 import io.github.mangi.eta.data.model.ReasoningEffort
+import io.github.mangi.eta.ui.navigation.AppRoute
 import io.github.mangi.eta.ui.app.AgentConversationRevisionReducer
 import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.app.LocalBlurEnabled
@@ -164,6 +165,7 @@ internal fun AgentChatBody(
     onRunTraceClick: () -> Unit,
     onOpenBrowser: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    onOpenRoute: ((AppRoute) -> Unit)? = null,
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
@@ -272,6 +274,7 @@ internal fun AgentChatBody(
         onRunTraceClick = onRunTraceClick,
         onOpenBrowser = onOpenBrowser,
         onOpenModelProviders = onOpenModelProviders,
+        onOpenRoute = onOpenRoute,
         taskQueueState = taskQueueState,
         onSteerTask = onSteerTask,
         onDeleteTask = onDeleteTask,
@@ -324,6 +327,7 @@ private fun AgentChatScaffold(
     onRunTraceClick: () -> Unit,
     onOpenBrowser: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    onOpenRoute: ((AppRoute) -> Unit)? = null,
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
@@ -380,6 +384,7 @@ private fun AgentChatScaffold(
                 onRemoveFileReference = onRemoveFileReference,
                 onCancelMessageEdit = onCancelMessageEdit,
                 onOpenModelProviders = onOpenModelProviders,
+                onOpenRoute = onOpenRoute,
                 taskQueueState = taskQueueState,
                 onSteerTask = onSteerTask,
                 onDeleteTask = onDeleteTask,
@@ -933,6 +938,7 @@ private fun AgentChatBottomBar(
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    onOpenRoute: ((AppRoute) -> Unit)? = null,
     taskQueueState: TaskQueueUiState = TaskQueueUiState(),
     onSteerTask: (String) -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
@@ -1079,6 +1085,7 @@ private fun AgentChatBottomBar(
                 onRemoveFileReference = onRemoveFileReference,
                 onCancelMessageEdit = onCancelMessageEdit,
                 onOpenModelProviders = onOpenModelProviders,
+                onOpenRoute = onOpenRoute,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

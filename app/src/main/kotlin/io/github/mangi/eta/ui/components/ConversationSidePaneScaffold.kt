@@ -47,11 +47,13 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.TheaterComedy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -91,8 +94,13 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import io.github.mangi.eta.R
+import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.ConversationPaneUiState
+import io.github.mangi.eta.ui.model.formatCompactTokenCount
 import io.github.mangi.eta.ui.model.ConversationSummaryUi
+import io.github.mangi.eta.ui.theme.EtaRadius
+import io.github.mangi.eta.ui.theme.EtaSize
+import io.github.mangi.eta.ui.theme.EtaSpacing
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collectLatest
 import top.yukonga.miuix.kmp.basic.DropdownDefaults
@@ -127,29 +135,40 @@ private object DrawerMetrics {
     const val SettleStiffness = 146f
     const val SettleVisibilityThresholdPx = 0.5f
     const val SettlePositionThresholdFraction = 0.5f
-    val PaneHorizontalPadding = 16.dp
-    val TopInset = 16.dp
+    val PaneHorizontalPadding = EtaSpacing.lg
+    val TopInset = EtaSpacing.lg
     val AfterActionBar = 18.dp
-    val BottomInset = 12.dp
+    val BottomInset = EtaSpacing.md
     val ActionIconSize = 20.dp
-    val SectionTopPadding = 8.dp
-    val SectionBottomPadding = 10.dp
+    val SectionTopPadding = EtaSpacing.sm
+    val SectionBottomPadding = EtaSpacing.md
     val SectionIconSize = 14.dp
-    val SectionIconGap = 8.dp
-    val SectionCountGap = 12.dp
-    val RowMinHeight = 48.dp
-    val RowGap = 4.dp
-    val RowCornerRadius = 12.dp
-    val RowHorizontalPadding = 12.dp
-    val RowVerticalPadding = 12.dp
+    val SectionIconGap = EtaSpacing.sm
+    val SectionCountGap = EtaSpacing.md
+    /** 行高对齐 EtaSize.listRow（52dp），与二级页列表行统一。 */
+    val RowMinHeight = EtaSize.listRow
+    val RowGap = EtaSpacing.xs
+    val RowCornerRadius = EtaRadius.card
+    val RowHorizontalPadding = EtaSpacing.md
+    val RowVerticalPadding = EtaSpacing.md
     val ActiveDotSize = 6.dp
     val ActiveDotGap = 10.dp
     val EmptyVerticalPadding = 28.dp
-    val DockTopGap = 10.dp
-    val DockEntryCornerRadius = 12.dp
+    val DockTopGap = EtaSpacing.md
+    val DockEntryCornerRadius = EtaRadius.control
     val DockEntryIconSize = 20.dp
     val DockEntryLabelGap = 3.dp
-    val DockEntryVerticalPadding = 5.dp
+    val DockEntryVerticalPadding = EtaSpacing.sm
+    /** 信息行之间的间距。 */
+    val InfoRowGap = EtaSpacing.sm
+    /** 上下文用量进度条高度。 */
+    val ContextBarHeight = 6.dp
+    /** 上下文用量进度条圆角（取高度的一半，呈胶囊形）。 */
+    val ContextBarCornerRadius = 3.dp
+    /** 底部 Dock 两个语义分区之间的间距。 */
+    val DockSectionGap = EtaSpacing.md
+    /** Dock 分区标签与图标行之间的间距。 */
+    val DockLabelGap = EtaSpacing.xs
 }
 
 private enum class ConversationPaneAnchor {
@@ -158,8 +177,10 @@ private enum class ConversationPaneAnchor {
 }
 
 @Composable
-fun ConversationSidePaneScaffold(
+internal fun ConversationSidePaneScaffold(
     state: ConversationPaneUiState,
+    modelName: String,
+    contextUsage: AgentContextUsageUi?,
     visible: Boolean,
     backHandlerEnabled: Boolean,
     onOpen: () -> Unit,
@@ -257,6 +278,8 @@ fun ConversationSidePaneScaffold(
         ConversationPanePanel(
             state = state,
             width = paneWidth,
+            modelName = modelName,
+            contextUsage = contextUsage,
             onSearchChange = onSearchChange,
             onConversationSelected = onConversationSelected,
             onConversationRename = onConversationRename,
@@ -348,6 +371,8 @@ fun ConversationSidePaneScaffold(
 private fun ConversationPanePanel(
     state: ConversationPaneUiState,
     width: androidx.compose.ui.unit.Dp,
+    modelName: String,
+    contextUsage: AgentContextUsageUi?,
     onSearchChange: (String) -> Unit,
     onConversationSelected: (String) -> Unit,
     onConversationRename: (ConversationSummaryUi) -> Unit,
@@ -401,6 +426,16 @@ private fun ConversationPanePanel(
                 verticalArrangement = Arrangement.spacedBy(DrawerMetrics.RowGap),
                 overscrollEffect = null,
             ) {
+                item(key = "pane-environment") {
+                    PaneEnvironmentCard(
+                        modelName = modelName,
+                        contextUsage = contextUsage,
+                        onOpenModelProviders = onOpenModelProviders,
+                    )
+                }
+                item(key = "pane-section-recent") {
+                    PaneSectionLabel(text = stringResource(R.string.drawer_section_recent))
+                }
                 if (state.conversations.isEmpty()) {
                     item {
                         EmptyConversations(isSearching = query.isNotBlank())
@@ -530,10 +565,171 @@ private fun PaneFrostRegion(
     }
 }
 
+/** Linux 环境的工作目录，与 TerminalRuntime / ProotCommandBuilder 的默认 cwd 保持一致。 */
+private const val DrawerWorkspacePath = "/workspace"
+
 private val PaneDividerThickness = 0.5.dp
 private const val PaneDividerAlpha = 0.5f
 private const val PaneFrostBlurRadius = 25f
 private const val PaneFrostSurfaceAlpha = 0.78f
+
+/**
+ * 运行环境卡：当前模型、工作区与上下文用量。
+ *
+ * 参考基准：NEXUS Agent `chat_catalog_drawer.dart` 的抽屉信息分区，
+ * 承载在 EtaCard 上（实色底 + 1dp hairline 框线），保持侧栏纯白不透明。
+ *
+ * 上下文用量为静态数值渲染：不使用 rememberInfiniteTransition 或任何常驻动画，
+ * 避免引入周期性唤醒（功耗红线）。
+ */
+@Composable
+private fun PaneEnvironmentCard(
+    modelName: String,
+    contextUsage: AgentContextUsageUi?,
+    onOpenModelProviders: () -> Unit,
+) {
+    EtaCard(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = DrawerMetrics.RowCornerRadius,
+        insideMargin = PaddingValues(
+            horizontal = DrawerMetrics.RowHorizontalPadding,
+            vertical = DrawerMetrics.RowVerticalPadding,
+        ),
+    ) {
+        PaneInfoRow(
+            label = stringResource(R.string.ui_current_model_a0af8f),
+            value = modelName.ifBlank { stringResource(R.string.drawer_value_unset) },
+            onClick = onOpenModelProviders,
+        )
+        Spacer(modifier = Modifier.height(DrawerMetrics.InfoRowGap))
+        PaneInfoRow(
+            label = stringResource(R.string.drawer_workspace_label),
+            value = DrawerWorkspacePath,
+        )
+        Spacer(modifier = Modifier.height(DrawerMetrics.InfoRowGap))
+        PaneContextUsageRow(usage = contextUsage)
+    }
+}
+
+/** 单条信息行：左侧标签、右侧取值；传入 onClick 时整行可点击。 */
+@Composable
+private fun PaneInfoRow(
+    label: String,
+    value: String,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 1,
+        )
+        Spacer(modifier = Modifier.width(DrawerMetrics.SectionIconGap))
+        Text(
+            text = value,
+            modifier = Modifier.weight(1f),
+            style = MiuixTheme.textStyles.footnote1,
+            color = MiuixTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 上下文用量 HUD：占比文本 + 静态进度条 + token 明细。 */
+@Composable
+private fun PaneContextUsageRow(usage: AgentContextUsageUi?) {
+    val progress = usage?.progress
+    val barColor = when {
+        progress == null -> MiuixTheme.colorScheme.onSurfaceVariantActions
+        progress >= 0.95f -> StatusError
+        progress >= 0.80f -> StatusWarning
+        else -> MiuixTheme.colorScheme.primary
+    }
+    val tokens = usage?.contextTokens
+    val window = usage?.contextWindow
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.ui_contextual_usage_d12810),
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = progress?.let { "${(it * 100f).roundToInt()}%" }
+                    ?: stringResource(R.string.context_no_previous_usage),
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
+        Spacer(modifier = Modifier.height(DrawerMetrics.InfoRowGap))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(DrawerMetrics.ContextBarHeight)
+                .clip(RoundedCornerShape(DrawerMetrics.ContextBarCornerRadius))
+                .background(MiuixTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            if (progress != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(DrawerMetrics.ContextBarCornerRadius))
+                        .background(barColor),
+                )
+            }
+        }
+        if (tokens != null && window != null && window > 0) {
+            Spacer(modifier = Modifier.height(DrawerMetrics.DockLabelGap))
+            Text(
+                text = "${formatCompactTokenCount(tokens)} / ${formatCompactTokenCount(window)}",
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** 抽屉列表内的分区段头（无图标、无计数）。 */
+@Composable
+private fun PaneSectionLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(
+            top = DrawerMetrics.SectionTopPadding,
+            bottom = DrawerMetrics.SectionBottomPadding,
+        ),
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        style = MiuixTheme.textStyles.footnote1,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+/** 底部 Dock 的语义分区标签。 */
+@Composable
+private fun PaneDockSectionLabel(text: String) {
+    Text(
+        text = text,
+        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+        style = MiuixTheme.textStyles.footnote2,
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+    )
+}
 
 @Composable
 private fun PaneActionBar(
@@ -787,46 +983,62 @@ private fun PaneDock(
     onOpenCharacters: () -> Unit,
     onOpenPermissions: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        DockEntry(
-            icon = Icons.Rounded.Settings,
-            label = "设置",
-            onClick = onOpenSettings,
-            modifier = Modifier.weight(1f),
-        )
-        DockEntry(
-            icon = Icons.Rounded.Memory,
-            label = "模型",
-            onClick = onOpenModelProviders,
-            modifier = Modifier.weight(1f),
-        )
-        DockEntry(
-            icon = Icons.Rounded.Inventory2,
-            label = "工具",
-            onClick = onOpenTools,
-            modifier = Modifier.weight(1f),
-        )
-        DockEntry(
-            icon = Icons.Rounded.Extension,
-            label = "Skills",
-            onClick = onOpenSkills,
-            modifier = Modifier.weight(1f),
-        )
-        DockEntry(
-            icon = Icons.Rounded.Lock,
-            label = "权限",
-            onClick = onOpenPermissions,
-            modifier = Modifier.weight(1f),
-        )
-        DockEntry(
-            icon = Icons.Rounded.TheaterComedy,
-            label = "角色",
-            onClick = onOpenCharacters,
-            modifier = Modifier.weight(1f),
-        )
+    // 语义分组：与抽屉顶部的「最近会话」一起构成抽屉的三段信息架构。
+    // 入口数量与原来完全一致，仅按语义分到两行，不新增也不删减任何入口。
+    Column(modifier = Modifier.fillMaxWidth()) {
+        PaneDockSectionLabel(text = stringResource(R.string.drawer_section_workspace))
+        Spacer(modifier = Modifier.height(DrawerMetrics.DockLabelGap))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            DockEntry(
+                icon = Icons.Rounded.Inventory2,
+                label = "工具",
+                onClick = onOpenTools,
+                modifier = Modifier.weight(1f),
+            )
+            DockEntry(
+                icon = Icons.Rounded.Extension,
+                label = "Skills",
+                onClick = onOpenSkills,
+                modifier = Modifier.weight(1f),
+            )
+            DockEntry(
+                icon = Icons.Rounded.TheaterComedy,
+                label = "角色",
+                onClick = onOpenCharacters,
+                modifier = Modifier.weight(1f),
+            )
+            DockEntry(
+                icon = Icons.Rounded.Lock,
+                label = "权限",
+                onClick = onOpenPermissions,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.height(DrawerMetrics.DockSectionGap))
+        PaneDockSectionLabel(text = stringResource(R.string.drawer_section_system))
+        Spacer(modifier = Modifier.height(DrawerMetrics.DockLabelGap))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            DockEntry(
+                icon = Icons.Rounded.Memory,
+                label = "模型",
+                onClick = onOpenModelProviders,
+                modifier = Modifier.weight(1f),
+            )
+            DockEntry(
+                icon = Icons.Rounded.Settings,
+                label = "设置",
+                onClick = onOpenSettings,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f))
+        }
     }
 }
 

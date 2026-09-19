@@ -71,23 +71,39 @@ internal val ChatInputPopupMargin = 8.dp
 internal val ChatInputActionSize = 32.dp
 /** 图标/可见圆钮尺寸：与 ChatInputActionSize 一致，保证输入栏所有圆钮直径相同。 */
 internal val ChatInputActionIconSize = 32.dp
+/** 图标字形尺寸：24dp。
+ *
+ *  修复点：此前图标尺寸与圆钮尺寸同为 32dp，图标顶满圆钮、四周零留白。
+ *  现在图标字形独立收敛到本常量，圆钮直径仍为 [ChatInputActionSize]（32dp）不变，
+ *  因此输入栏所有圆钮可见尺寸依旧统一，只是图标恢复了 4dp 内边距。
+ */
+internal val ChatInputActionGlyphSize = 24.dp
 
+/**
+ * 附件选择器启动句柄。
+ *
+ * 输入栏「+」按钮的弹出菜单与工具箱面板共用同一套选择逻辑与回退路径，
+ * 避免出现两份行为可能走样的实现。
+ */
+internal class AttachmentPickerLaunchers(
+    val pickImage: () -> Unit,
+    val pickFiles: () -> Unit,
+    val pickFolder: () -> Unit,
+)
+
+/**
+ * 创建附件选择器启动句柄。
+ *
+ * 行为与改造前 [AgentAttachmentPickerButton] 内部完全一致：
+ * 存在 ActivityResultRegistry 时走 Compose 选择器，否则回退到 Trampoline Activity。
+ */
 @Composable
-internal fun AgentAttachmentPickerButton(
-    popupAnchorTopPx: Int,
-    popupMaxHeight: Dp,
+internal fun rememberAttachmentPickerLaunchers(
     onAttachImage: (String) -> Unit,
     onAttachFiles: (List<String>) -> Unit,
     onAttachFolder: (String) -> Unit,
-    onAttachFilePath: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+): AttachmentPickerLaunchers {
     val context = LocalContext.current
-    val isSiriStyle = LocalSiriStage.current
-    val siriDark = isSystemInDarkTheme()
-    var showPopup by remember { mutableStateOf(false) }
-    var showPathDialog by remember { mutableStateOf(false) }
-    var pathInput by remember { mutableStateOf("") }
     val registryOwner = androidx.activity.compose.LocalActivityResultRegistryOwner.current
 
     val photoPicker = if (registryOwner != null) {
@@ -138,9 +154,103 @@ internal fun AgentAttachmentPickerButton(
         }
     } else null
 
+    return AttachmentPickerLaunchers(
+        pickImage = {
+            if (photoPicker != null) {
+                photoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            } else {
+                AgentAttachmentPickerTrampolineActivity.pickImages(context) { uris ->
+                    uris.forEach { onAttachImage(it) }
+                }
+            }
+        },
+        pickFiles = {
+            if (filePicker != null) {
+                filePicker.launch(arrayOf("*/*"))
+            } else {
+                AgentAttachmentPickerTrampolineActivity.pickFiles(context) { uris ->
+                    onAttachFiles(uris)
+                }
+            }
+        },
+        pickFolder = {
+            if (folderPicker != null) {
+                folderPicker.launch(null)
+            } else {
+                AgentAttachmentPickerTrampolineActivity.pickFolder(context) { uri ->
+                    onAttachFolder(uri)
+                }
+            }
+        },
+    )
+}
+
+/**
+ * 「输入路径」对话框：输入栏「+」弹出菜单与工具箱面板共用。
+ */
+@Composable
+internal fun AgentAttachmentPathDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var pathInput by remember { mutableStateOf("") }
+    LaunchedEffect(show) {
+        if (show) pathInput = ""
+    }
+    OverlayDialog(
+        show = show,
+        title = stringResource(R.string.ui_input_file_path_36d474),
+        summary = stringResource(R.string.ui_supports_files_and_folders_under_internal_storage_or_520786),
+        onDismissRequest = onDismiss,
+    ) {
+        Column {
+            TextField(
+                value = pathInput,
+                onValueChange = { pathInput = it },
+                label = stringResource(R.string.ui_absolute_path_9ac6fc),
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MiuixDialogActions(
+                confirmText = stringResource(R.string.attachment_add),
+                confirmEnabled = pathInput.trim().startsWith('/'),
+                onCancel = onDismiss,
+                onConfirm = {
+                    val path = pathInput.trim()
+                    onDismiss()
+                    onConfirm(path)
+                },
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun AgentAttachmentPickerButton(
+    launchers: AttachmentPickerLaunchers,
+    popupAnchorTopPx: Int,
+    popupMaxHeight: Dp,
+    onAttachFilePath: (String) -> Unit,
+    onOpenToolPanel: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val isSiriStyle = LocalSiriStage.current
+    val siriDark = isSystemInDarkTheme()
+    var showPopup by remember { mutableStateOf(false) }
+    var showPathDialog by remember { mutableStateOf(false) }
+
     Box(modifier = modifier) {
         IconButton(
-            onClick = { showPopup = true },
+            onClick = {
+                // 主界面/对话页：打开工具箱面板；浮窗（未提供 onOpenToolPanel）：保持原有列表菜单。
+                if (onOpenToolPanel != null) onOpenToolPanel() else showPopup = true
+            },
             minWidth = ChatInputActionSize,
             minHeight = ChatInputActionSize,
             modifier = if (isSiriStyle) {
@@ -157,7 +267,7 @@ internal fun AgentAttachmentPickerButton(
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = stringResource(R.string.ui_add_attachment_dba9e8),
-                modifier = Modifier.size(ChatInputActionIconSize),
+                modifier = Modifier.size(ChatInputActionGlyphSize),
                 tint = MiuixTheme.colorScheme.onSurface,
             )
         }
@@ -187,39 +297,10 @@ internal fun AgentAttachmentPickerButton(
                         onSelectedIndexChange = {
                             dismiss?.invoke()
                             when (index) {
-                                0 -> {
-                                    if (photoPicker != null) {
-                                        photoPicker.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    } else {
-                                        AgentAttachmentPickerTrampolineActivity.pickImages(context) { uris ->
-                                            uris.forEach { onAttachImage(it) }
-                                        }
-                                    }
-                                }
-                                1 -> {
-                                    if (filePicker != null) {
-                                        filePicker.launch(arrayOf("*/*"))
-                                    } else {
-                                        AgentAttachmentPickerTrampolineActivity.pickFiles(context) { uris ->
-                                            onAttachFiles(uris)
-                                        }
-                                    }
-                                }
-                                2 -> {
-                                    if (folderPicker != null) {
-                                        folderPicker.launch(null)
-                                    } else {
-                                        AgentAttachmentPickerTrampolineActivity.pickFolder(context) { uri ->
-                                            onAttachFolder(uri)
-                                        }
-                                    }
-                                }
-                                3 -> {
-                                    pathInput = ""
-                                    showPathDialog = true
-                                }
+                                0 -> launchers.pickImage()
+                                1 -> launchers.pickFiles()
+                                2 -> launchers.pickFolder()
+                                3 -> showPathDialog = true
                             }
                         },
                     )
@@ -228,35 +309,11 @@ internal fun AgentAttachmentPickerButton(
         }
     }
 
-    OverlayDialog(
+    AgentAttachmentPathDialog(
         show = showPathDialog,
-        title = stringResource(R.string.ui_input_file_path_36d474),
-        summary = stringResource(R.string.ui_supports_files_and_folders_under_internal_storage_or_520786),
-        onDismissRequest = { showPathDialog = false },
-    ) {
-        Column {
-            TextField(
-                value = pathInput,
-                onValueChange = { pathInput = it },
-                label = stringResource(R.string.ui_absolute_path_9ac6fc),
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            MiuixDialogActions(
-                confirmText = stringResource(R.string.attachment_add),
-                confirmEnabled = pathInput.trim().startsWith('/'),
-                onCancel = { showPathDialog = false },
-                onConfirm = {
-                    val path = pathInput.trim()
-                    showPathDialog = false
-                    onAttachFilePath(path)
-                },
-                modifier = Modifier.padding(top = 16.dp),
-            )
-        }
-    }
+        onDismiss = { showPathDialog = false },
+        onConfirm = onAttachFilePath,
+    )
 }
 
 @Composable

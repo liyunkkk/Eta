@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.mangi.eta.R
+import io.github.mangi.eta.ui.navigation.AppRoute
 import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.model.AgentContextUsageUi
@@ -96,7 +97,7 @@ import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 
-private val SendButtonVisualSize = ChatInputActionIconSize
+private val SendButtonVisualSize = ChatInputActionSize
 private val SendIconSize = 16.dp
 private val StopIconSize = 10.dp
 private val ThinkingIconSize = 21.dp
@@ -134,6 +135,8 @@ internal fun AgentChatInputBar(
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
     onOpenModelProviders: () -> Unit = {},
+    onOpenToolPanel: (() -> Unit)? = null,
+    onOpenRoute: ((AppRoute) -> Unit)? = null,
     focusRequester: FocusRequester = remember { FocusRequester() },
     modifier: Modifier = Modifier,
 ) {
@@ -148,6 +151,14 @@ internal fun AgentChatInputBar(
     val density = LocalDensity.current
     val statusBarTopPx = WindowInsets.statusBars.getTop(density)
     var inputContainerTopPx by remember { mutableIntStateOf(0) }
+    // 工具箱面板状态与共享的选择器句柄。
+    var showToolPanel by remember { mutableStateOf(false) }
+    var showToolPanelPathDialog by remember { mutableStateOf(false) }
+    val toolPanelLaunchers = rememberAttachmentPickerLaunchers(
+        onAttachImage = onAttachImage,
+        onAttachFiles = onAttachFiles,
+        onAttachFolder = onAttachFolder,
+    )
     val thinkingPopupMaxHeight = with(density) {
         (inputContainerTopPx - statusBarTopPx).coerceAtLeast(0).toDp()
     }.minus(ChatInputPopupMargin * 2)
@@ -319,18 +330,19 @@ internal fun AgentChatInputBar(
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
                                     contentDescription = stringResource(R.string.ui_cancel_edit_c698df),
-                                    modifier = Modifier.size(ChatInputActionIconSize),
+                                    modifier = Modifier.size(ChatInputActionGlyphSize),
                                     tint = MiuixTheme.colorScheme.onSurface,
                                 )
                             }
                         } else {
                             AgentAttachmentPickerButton(
+                                launchers = toolPanelLaunchers,
                                 popupAnchorTopPx = inputContainerTopPx,
                                 popupMaxHeight = thinkingPopupMaxHeight,
-                                onAttachImage = onAttachImage,
-                                onAttachFiles = onAttachFiles,
-                                onAttachFolder = onAttachFolder,
                                 onAttachFilePath = onAttachFilePath,
+                                onOpenToolPanel = onOpenToolPanel?.let {
+                                    { showToolPanel = true }
+                                },
                             )
 
                             Spacer(modifier = Modifier.width(2.dp))
@@ -455,6 +467,23 @@ internal fun AgentChatInputBar(
         }
     }
 
+    // 工具箱面板与「输入路径」对话框（与输入栏「+」弹出菜单共用同一套选择逻辑）。
+    if (onOpenRoute != null) {
+        AgentInputToolPanel(
+            show = showToolPanel,
+            onDismiss = { showToolPanel = false },
+            onPickImage = toolPanelLaunchers.pickImage,
+            onPickFiles = toolPanelLaunchers.pickFiles,
+            onPickFolder = toolPanelLaunchers.pickFolder,
+            onPickPath = { showToolPanelPathDialog = true },
+            onOpenRoute = onOpenRoute,
+        )
+        AgentAttachmentPathDialog(
+            show = showToolPanelPathDialog,
+            onDismiss = { showToolPanelPathDialog = false },
+            onConfirm = onAttachFilePath,
+        )
+    }
 }
 
 /** 思考强度选择保持为单一图标，当前状态仅通过图标颜色表达。 */

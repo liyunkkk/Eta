@@ -1217,4 +1217,18 @@
   <string name="functional_model_set_as_translation">Set as Screen Translation Model</string>
   <string name="functional_model_current_chat">Current Chat Model</string>
   <string name="functional_model_current_translation">Current Screen Translation Model</string>
+  <string name="drawer_section_recent">Recent conversations</string>
+  <string name="drawer_section_workspace">Workspace &amp; capabilities</string>
+  <string name="drawer_section_system">System &amp; settings</string>
+  <string name="drawer_workspace_label">Workspace</string>
+  <string name="drawer_value_unset">Not set</string>
+  <string name="input_tool_panel_title">Toolbox</string>
+  <string name="input_tool_panel_subtitle_image">Pick from album</string>
+  <string name="input_tool_panel_subtitle_file">Any file</string>
+  <string name="input_tool_panel_subtitle_folder">Whole folder</string>
+  <string name="input_tool_panel_subtitle_path">Type a path</string>
+  <string name="input_tool_panel_subtitle_tools">Built-in tools</string>
+  <string name="input_tool_panel_subtitle_skills">Installed skills</string>
+  <string name="input_tool_panel_subtitle_terminal">Linux shell</string>
+  <string name="input_tool_panel_subtitle_mcp">External servers</string>
 </resources>
