@@ -98,8 +98,6 @@ import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.ConversationPaneUiState
 import io.github.mangi.eta.ui.model.formatCompactTokenCount
 import io.github.mangi.eta.ui.model.ConversationSummaryUi
-import io.github.mangi.eta.ui.theme.EtaRadius
-import io.github.mangi.eta.ui.theme.EtaSize
 import io.github.mangi.eta.ui.theme.EtaSpacing
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collectLatest
@@ -135,30 +133,29 @@ private object DrawerMetrics {
     const val SettleStiffness = 146f
     const val SettleVisibilityThresholdPx = 0.5f
     const val SettlePositionThresholdFraction = 0.5f
-    val PaneHorizontalPadding = EtaSpacing.lg
-    val TopInset = EtaSpacing.lg
+    val PaneHorizontalPadding = 16.dp
+    val TopInset = 16.dp
     val AfterActionBar = 18.dp
-    val BottomInset = EtaSpacing.md
+    val BottomInset = 12.dp
     val ActionIconSize = 20.dp
-    val SectionTopPadding = EtaSpacing.sm
-    val SectionBottomPadding = EtaSpacing.md
+    val SectionTopPadding = 8.dp
+    val SectionBottomPadding = 10.dp
     val SectionIconSize = 14.dp
-    val SectionIconGap = EtaSpacing.sm
-    val SectionCountGap = EtaSpacing.md
-    /** 行高对齐 EtaSize.listRow（52dp），与二级页列表行统一。 */
-    val RowMinHeight = EtaSize.listRow
-    val RowGap = EtaSpacing.xs
-    val RowCornerRadius = EtaRadius.card
-    val RowHorizontalPadding = EtaSpacing.md
-    val RowVerticalPadding = EtaSpacing.md
+    val SectionIconGap = 8.dp
+    val SectionCountGap = 12.dp
+    val RowMinHeight = 48.dp
+    val RowGap = 4.dp
+    val RowCornerRadius = 12.dp
+    val RowHorizontalPadding = 12.dp
+    val RowVerticalPadding = 12.dp
     val ActiveDotSize = 6.dp
     val ActiveDotGap = 10.dp
     val EmptyVerticalPadding = 28.dp
-    val DockTopGap = EtaSpacing.md
-    val DockEntryCornerRadius = EtaRadius.control
+    val DockTopGap = 10.dp
+    val DockEntryCornerRadius = 12.dp
     val DockEntryIconSize = 20.dp
     val DockEntryLabelGap = 3.dp
-    val DockEntryVerticalPadding = EtaSpacing.sm
+    val DockEntryVerticalPadding = 5.dp
     /** 信息行之间的间距。 */
     val InfoRowGap = EtaSpacing.sm
     /** 上下文用量进度条高度。 */
