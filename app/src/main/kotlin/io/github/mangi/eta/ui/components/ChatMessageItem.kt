@@ -23,6 +23,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -137,6 +138,8 @@ import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import io.github.mangi.eta.R
+import io.github.mangi.eta.data.model.AppearanceVisualStyle
+import io.github.mangi.eta.ui.app.LocalAppearanceSettings
 import io.github.mangi.eta.ui.theme.SiriShapes
 import io.github.mangi.eta.agent.browser.AgentBrowserSession
 import io.github.mangi.eta.agent.browser.BrowserSessionSnapshot
@@ -201,7 +204,27 @@ private fun decodeDataUrlBitmap(dataUrl: String): ImageBitmap? {
  */
 @Composable
 fun AITypingIndicator(modifier: Modifier = Modifier) {
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
     val infiniteTransition = rememberInfiniteTransition(label = "dots")
+    if (isSiriStyle) {
+        // Apple Intelligence 加载态：单颗纯黑小圆点呼吸。
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(700, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "siri_dot_alpha"
+        )
+        Box(
+            modifier = modifier
+                .size(10.dp)
+                .graphicsLayer(alpha = alpha)
+                .background(MiuixTheme.colorScheme.onSurface, CircleShape)
+        )
+        return
+    }
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -512,6 +535,8 @@ private fun UserMessageBubble(
     val visiblePrompt = remember(message.content) {
         AgentFileReferencePromptCodec.parse(message.content)
     }
+    val isSiriStyle = LocalAppearanceSettings.current.visualStyle == AppearanceVisualStyle.SIRI
+    val siriDark = isSystemInDarkTheme()
 
     Row(
         modifier = modifier
@@ -569,12 +594,21 @@ private fun UserMessageBubble(
             Column(
                 modifier = Modifier
                     .widthIn(max = 320.dp)
-                    .squircleSurface(
-                        color = MiuixTheme.colorScheme.surfaceContainerHigh,
-                        topStart = 20.dp,
-                        topEnd = 20.dp,
-                        bottomEnd = 6.dp,
-                        bottomStart = 20.dp,
+                    .then(
+                        if (isSiriStyle) {
+                            // Apple Intelligence 用户气泡：浅灰大圆角（尾角小圆角）。
+                            Modifier
+                                .clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
+                                .background(if (siriDark) Color(0xFF2C2C2E) else Color(0xE6F2F2F7))
+                        } else {
+                            Modifier.squircleSurface(
+                                color = MiuixTheme.colorScheme.surfaceContainerHigh,
+                                topStart = 20.dp,
+                                topEnd = 20.dp,
+                                bottomEnd = 6.dp,
+                                bottomStart = 20.dp,
+                            )
+                        }
                     )
                     .then(
                         if (isEditing) {
