@@ -87,7 +87,7 @@ private val TaskCapsuleHeight = 32.dp
  * horizontal 12dp 内距；点击弹出「压缩上下文」菜单。
  */
 @Composable
-fun ContextUsageCapsule(
+internal fun ContextUsageCapsule(
     usage: AgentContextUsageUi,
     onCompact: () -> Unit,
     canCompact: Boolean,
