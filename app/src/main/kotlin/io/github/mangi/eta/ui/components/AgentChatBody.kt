@@ -339,7 +339,8 @@ private fun AgentChatScaffold(
 ) {
     val surfaceColor = MiuixTheme.colorScheme.surface
     val isSiriStyle = LocalSiriStage.current
-    val siriBackdropVisible = LocalSiriBackdrop.current
+    // 背景按「是否有消息」判定：主页空态保留渐变，一旦有消息即对话页=纯白。
+    val siriBackdropVisible = LocalSiriBackdrop.current && !hasMessages
     val siriDark = isSystemInDarkTheme()
     val frostEnabled = hasMessages && LocalBlurEnabled.current && isRuntimeShaderSupported()
     val messageBackdrop = rememberLayerBackdrop {
@@ -1035,6 +1036,14 @@ private fun AgentChatBottomBar(
                     isExpanded = isTaskDashboardExpanded,
                     onClick = { isTaskDashboardExpanded = !isTaskDashboardExpanded },
                 )
+                if (showContextUsage) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ContextUsageCapsule(
+                        usage = contextUsage,
+                        onCompact = onCompactContext,
+                        canCompact = canCompactContext && !isStreaming,
+                    )
+                }
             }
             AnimatedVisibility(
                 visible = isTaskDashboardExpanded,
@@ -1063,8 +1072,6 @@ private fun AgentChatBottomBar(
                 input = input,
                 modelPickerState = modelPickerState,
                 isCompacting = isCompacting,
-                contextUsage = contextUsage,
-                showContextUsage = showContextUsage,
                 isStreaming = isStreaming,
                 reasoningEffort = reasoningEffort,
                 availableReasoningEfforts = availableReasoningEfforts,
@@ -1075,8 +1082,6 @@ private fun AgentChatBottomBar(
                 preserveFollowingMessages = messageEdit?.preserveFollowingMessages == true,
                 onSubmit = onSubmit,
                 onReasoningEffortChange = onReasoningEffortChange,
-                onCompactContext = onCompactContext,
-                canCompactContext = canCompactContext,
                 onModelSelected = onModelSelected,
                 onStop = onStop,
                 onAttachImage = onAttachImage,

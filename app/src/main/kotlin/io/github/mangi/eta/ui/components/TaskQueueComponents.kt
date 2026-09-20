@@ -44,21 +44,34 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.mangi.eta.R
 import io.github.mangi.eta.data.db.TaskAttachment
+import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.TaskItemUi
 import io.github.mangi.eta.ui.model.TaskQueueUiState
 import io.github.mangi.eta.ui.model.TaskStatusUi
+import io.github.mangi.eta.ui.model.formatContextUsage
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
+import top.yukonga.miuix.kmp.basic.ListPopupDefaults
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
+import top.yukonga.miuix.kmp.theme.LocalDismissState
 import io.github.mangi.eta.ui.app.LocalSiriStage
 import io.github.mangi.eta.ui.theme.siriGlassSurface
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -67,6 +80,96 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 private val TaskCapsuleIconSize = 15.dp
 /** 问题1：任务栏胶囊高度，与浮窗控制按钮/胶囊（32dp）统一。 */
 private val TaskCapsuleHeight = 32.dp
+
+/**
+ * 上下文用量胶囊（本体与浮窗的输入栏底部区完全同源）。
+ * 与 [TaskStatusCapsuleBadge] 同比例：32dp 高、液态玻璃胶囊面、footnote1 文字、
+ * horizontal 12dp 内距；点击弹出「压缩上下文」菜单。
+ */
+@Composable
+fun ContextUsageCapsule(
+    usage: AgentContextUsageUi,
+    onCompact: () -> Unit,
+    canCompact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val isSiriStyle = LocalSiriStage.current
+    val siriDark = isSystemInDarkTheme()
+    val progress = usage.progress
+    val progressColor = when {
+        progress == null -> MiuixTheme.colorScheme.onSurfaceVariantActions
+        progress >= 0.95f -> StatusError
+        progress >= 0.80f -> StatusWarning
+        else -> MiuixTheme.colorScheme.primary
+    }
+    val locale = LocalConfiguration.current.locales[0]
+    val summary = formatContextUsage(
+        usage = usage,
+        noUsageText = stringResource(R.string.context_no_previous_usage),
+        noLimitText = stringResource(R.string.context_no_model_limit),
+        locale = locale,
+    )
+    val usageDescription = stringResource(
+        R.string.context_usage_description,
+        summary.replace('\n', ' '),
+    )
+    var showPopup by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .then(
+                    if (isSiriStyle) {
+                        Modifier.siriGlassSurface(
+                            shape = RoundedCornerShape(percent = 50),
+                            isDark = siriDark,
+                            refractionAlpha = 0.8f,
+                        )
+                    } else {
+                        Modifier.background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                    },
+                )
+                .clickable { showPopup = true }
+                .heightIn(min = TaskCapsuleHeight)
+                .padding(horizontal = 12.dp)
+                .semantics { contentDescription = usageDescription },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            InfiniteProgressIndicator(
+                modifier = Modifier.size(TaskCapsuleIconSize),
+                color = progressColor,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.context_compaction),
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        OverlayListPopup(
+            show = showPopup,
+            popupPositionProvider = ListPopupDefaults.DropdownPositionProvider,
+            alignment = PopupPositionProvider.Align.TopStart,
+            onDismissRequest = { showPopup = false },
+        ) {
+            val dismiss = LocalDismissState.current
+            ListPopupColumn {
+                DropdownImpl(
+                    text = stringResource(R.string.context_compact_action),
+                    optionSize = 1,
+                    isSelected = false,
+                    index = 0,
+                    onSelectedIndexChange = {
+                        dismiss?.invoke()
+                        showPopup = false
+                        if (canCompact) onCompact()
+                    },
+                )
+            }
+        }
+    }
+}
 
 /**
  * 统一任务状态胶囊徽章（本体与悬浮窗完全同源设计）

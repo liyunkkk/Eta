@@ -45,7 +45,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.runtime.Composable
@@ -81,7 +80,6 @@ import io.github.mangi.eta.R
 import io.github.mangi.eta.ui.navigation.AppRoute
 import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.ui.app.LocalSiriStage
-import io.github.mangi.eta.ui.model.AgentContextUsageUi
 import io.github.mangi.eta.ui.model.AgentModelPickerUiState
 import io.github.mangi.eta.ui.model.PendingFileReferenceUi
 import io.github.mangi.eta.ui.model.PendingImageUi
@@ -121,8 +119,6 @@ internal fun AgentChatInputBar(
     input: String,
     modelPickerState: AgentModelPickerUiState,
     isCompacting: Boolean,
-    contextUsage: AgentContextUsageUi,
-    showContextUsage: Boolean,
     isStreaming: Boolean,
     reasoningEffort: ReasoningEffort,
     availableReasoningEfforts: List<ReasoningEffort>,
@@ -132,8 +128,6 @@ internal fun AgentChatInputBar(
     editHasLaterTurns: Boolean,
     preserveFollowingMessages: Boolean,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
-    onCompactContext: () -> Unit,
-    canCompactContext: Boolean,
     onModelSelected: (String) -> Unit,
     onSubmit: (String) -> Unit,
     onStop: () -> Unit,
@@ -371,12 +365,6 @@ internal fun AgentChatInputBar(
 
                         Spacer(modifier = Modifier.weight(1f))
 
-                        if (showContextUsage) {
-                            AgentContextUsageButton(usage = contextUsage, onCompact = onCompactContext, canCompact = canCompactContext && !isStreaming)
-
-                            Spacer(modifier = Modifier.width(2.dp))
-                        }
-
                         AgentModelPickerButton(
                             state = modelPickerState,
                             isStreaming = isStreaming,
@@ -417,20 +405,8 @@ internal fun AgentChatInputBar(
                             Box(
                                 modifier = Modifier
                                     .size(if (isSiriStyle) SendButtonSiriSize else SendButtonVisualSize)
-                                    .then(
-                                        if (isSiriStyle && !canSend && !isStopMode) {
-                                            // SIRI 待机态：液态玻璃圆钮（Mic），而非实心灰。
-                                            Modifier.siriGlassSurface(
-                                                shape = CircleShape,
-                                                isDark = siriDark,
-                                                refractionAlpha = 0.85f,
-                                            )
-                                        } else {
-                                            Modifier
-                                                .clip(CircleShape)
-                                                .background(sendButtonColor)
-                                        },
-                                    ),
+                                    .clip(CircleShape)
+                                    .background(sendButtonColor),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 AnimatedContent(
@@ -447,7 +423,7 @@ internal fun AgentChatInputBar(
                                     Icon(
                                         imageVector = when {
                                             stopMode -> Icons.Rounded.Stop
-                                            isSiriStyle && !canSend -> Icons.Rounded.Mic
+                                            isSiriStyle && !canSend -> Icons.Rounded.Send
                                             // 设计稿一比一：Siri 舞台发送键为白色纸飞机（Send）。
                                             isSiriStyle -> Icons.Rounded.Send
                                             else -> Icons.Rounded.ArrowUpward

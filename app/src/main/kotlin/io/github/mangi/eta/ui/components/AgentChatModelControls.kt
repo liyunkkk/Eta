@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -123,7 +122,7 @@ internal fun AgentModelPickerButton(
                 // 点击开合仍由 IconButton 承担；弹窗内容与定位零改动。
                 Row(
                     modifier = Modifier
-                        .widthIn(max = 168.dp)
+                        .width(152.dp)
                         .height(32.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(MiuixTheme.colorScheme.surface)

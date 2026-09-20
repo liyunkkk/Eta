@@ -3,6 +3,7 @@ package io.github.mangi.eta.agent.voice
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import io.github.mangi.eta.agent.task.AgentTaskManager
+import io.github.mangi.eta.ui.components.ContextUsageCapsule
 import io.github.mangi.eta.ui.components.TaskStatusCapsuleBadge
 import io.github.mangi.eta.ui.components.TaskTriTabDashboard
 import io.github.mangi.eta.ui.model.TaskQueueUiState
@@ -812,6 +813,13 @@ private fun AssistantComposer(
                 isExpanded = isTaskDashboardExpanded,
                 onClick = onToggleTaskDashboard,
             )
+            if (state.contextUsage.contextTokens != null) {
+                ContextUsageCapsule(
+                    usage = state.contextUsage,
+                    onCompact = onCompactContext,
+                    canCompact = state.canCompactContext && state.phase != EtaVoicePhase.PROCESSING,
+                )
+            }
             ConversationCapsule(
                 title = state.conversationTitle.ifBlank { stringResource(R.string.voice_new_conversation_hint) },
                 isMenuVisible = state.isHistoryMenuVisible,
@@ -861,8 +869,6 @@ private fun AssistantComposer(
             input = input,
             modelPickerState = state.modelPickerState,
             isCompacting = state.isCompacting,
-            contextUsage = state.contextUsage,
-            showContextUsage = state.contextUsage.contextTokens != null,
             isStreaming = state.phase == EtaVoicePhase.PROCESSING,
             reasoningEffort = state.reasoningEffort,
             availableReasoningEfforts = state.availableReasoningEfforts,
@@ -872,8 +878,6 @@ private fun AssistantComposer(
             editHasLaterTurns = false,
             preserveFollowingMessages = false,
             onReasoningEffortChange = onReasoningEffortChange,
-            onCompactContext = onCompactContext,
-            canCompactContext = state.canCompactContext && state.phase != EtaVoicePhase.PROCESSING,
             onModelSelected = onModelSelected,
             onSubmit = onSubmit,
             onStop = onStop,
